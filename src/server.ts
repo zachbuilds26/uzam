@@ -7,6 +7,7 @@ import * as z from "zod/v4";
 import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
+import { researchAsset, compareAssets } from "./research/engines.js";
 
 // ---- Fridge stock: static X Layer registry (no fake contracts, no guessing) ----
 type RegistryAsset = {
@@ -413,6 +414,30 @@ const handler = createMcpHandler(() => {
     }
   );
 
+  server.registerTool(
+    "research_asset",
+    {
+      description:
+        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Use when the user wants to understand an asset beyond basic market data.",
+      inputSchema: z.object({ symbol: z.string() }),
+    },
+    async ({ symbol }: { symbol: string }) => ({
+      content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol), null, 2) }],
+    })
+  );
+
+  server.registerTool(
+    "compare_assets",
+    {
+      description:
+        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Returns a structured table plus per-category leaders with reasons — never a bald recommendation.",
+      inputSchema: z.object({ symbols: z.array(z.string()).min(1).max(4) }),
+    },
+    async ({ symbols }: { symbols: string[] }) => ({
+      content: [{ type: "text", text: JSON.stringify(await compareAssets(symbols), null, 2) }],
+    })
+  );
+
   return server;
 });
 
@@ -440,7 +465,7 @@ app.get("/", (_req: Request, res: Response) => {
       "Uzam is an RWA intelligence MCP for X Layer tokenized stocks. Connect an MCP client to POST /mcp.",
     mcp_endpoint: "/mcp",
     health: "/health",
-    tools: ["identify_asset", "analyze_onchain", "analyze_backing"],
+    tools: ["identify_asset", "analyze_onchain", "analyze_backing", "research_asset", "compare_assets"],
   });
 });
 
