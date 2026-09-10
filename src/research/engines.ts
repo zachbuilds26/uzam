@@ -366,6 +366,52 @@ export async function gatherRecent(asset: RegistryAsset): Promise<{ items: AnyOb
   };
 }
 
+// ---- Human-readable summaries: structured markdown beside the JSON ----
+// Agents get full JSON; humans (and chat answers) get this.
+const SEV_RANK: Record<string, number> = { high: 0, moderate: 1, unknown: 2, low: 3 };
+
+export function summarizeResearch(r: AnyObj): string {
+  if (r.found !== true) return `**${r.symbol ?? "?"} — not identified.** ${r.uncertainty ?? ""} Supported: ${(r.supported_symbols ?? []).join(", ")}.`;
+  const lines: string[] = [];
+  lines.push(`## ${r.asset.symbol} — ${r.asset.name} (X Layer)`);
+  lines.push(`**Confidence: ${r.confidence.overall}** (identity ${r.confidence.identity} · onchain ${r.confidence.onchain} · backing ${r.confidence.backing})`);
+  const t = r.onchain.trading_activity ?? {};
+  lines.push(`**Price:** ${t.price ?? "n/a"} · **Holders:** ${r.onchain.holders_count ?? "n/a"} · **Top 10:** ${r.onchain.holder_concentration?.top10HoldPercent ?? "n/a"}% · **Liquidity:** ${t.liquidity ?? "n/a"}`);
+  lines.push(`### Backing`);
+  lines.push(`${r.backing.issuer_claim ?? "No backing statement."} (confidence ${r.backing.confidence})`);
+  lines.push(`Custodian: ${r.backing.custodian ?? "UNKNOWN"}`);
+  const risks = [...(r.risks as Risk[])].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]).slice(0, 3);
+  lines.push(`### Top risks`);
+  for (const x of risks) lines.push(`- **${x.category}** (${x.severity}): ${x.reason}`);
+  const unknowns = (r.unknowns as string[]).slice(0, 4);
+  lines.push(`### Unknowns`);
+  for (const u of unknowns) lines.push(`- ${u}`);
+  const recent = (r.recent_developments as AnyObj[]).slice(0, 3);
+  lines.push(`### Recent developments`);
+  if (recent.length === 0) lines.push(`- None found${r.recent_note ? ` (${r.recent_note})` : ""}.`);
+  for (const n of recent) lines.push(`- ${n.title} (${n.source ?? "news"})`);
+  const contra = r.contradictions as AnyObj[];
+  lines.push(`### Contradictions`);
+  if (contra.length === 0) lines.push(`- None — sources agree.`);
+  for (const c of contra) lines.push(`- CONFLICT: ${c.issue} See: ${c.recommended_action}`);
+  return lines.join("\n");
+}
+
+export function summarizeCompare(c: AnyObj): string {
+  if (!c.rows || c.rows.length === 0) return `**No assets compared.** ${c.error ?? ""}`;
+  const lines: string[] = [];
+  lines.push(`## Comparison: ${(c.compared as string[]).join(" vs ")}`);
+  lines.push(`| Asset | Price | Holders | Top 10 | Liquidity | Backing | Overall |`);
+  lines.push(`|---|---|---|---|---|---|---|`);
+  for (const r of c.rows as AnyObj[]) {
+    lines.push(`| ${r.symbol} | ${r.price ?? "n/a"} | ${r.holders ?? "n/a"} | ${r.top10HoldPercent ?? "n/a"}% | ${r.liquidity ?? "n/a"} | ${r.backing_confidence} | ${r.overall_confidence} |`);
+  }
+  lines.push(`### Leaders (per category, evidence-based — not overall recommendations)`);
+  for (const l of (c.leaders as AnyObj[])) lines.push(`- **${l.category}: ${l.leader}** — ${l.reason}`);
+  if ((c.not_found as string[]).length > 0) lines.push(`Not found: ${(c.not_found as string[]).join(", ")}.`);
+  return lines.join("\n");
+}
+
 // ---- research_asset: one-call full report ----
 export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full"): Promise<AnyObj> {
   const clean = symbol.trim().toUpperCase();
@@ -441,10 +487,12 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     confidence: { overall, identity: "HIGH", onchain: onchain.confidence ?? "UNKNOWN", backing: backing.confidence ?? "UNKNOWN" },
     data_timestamp: now(),
   };
+  report.summary = summarizeResearch(report);
   if (focus === "risks") {
     return {
       found: true, focus, asset: report.asset,
       risks: report.risks, unknowns: report.unknowns, confidence: report.confidence,
+      summary: `## ${report.asset.symbol} — top risks\n` + (report.risks as Risk[]).map((x) => `- **${x.category}** (${x.severity}): ${x.reason}`).join("\n"),
       note: "Risks focus: full data gathered, only risk sections returned.",
       data_timestamp: report.data_timestamp,
     };
@@ -489,10 +537,12 @@ export async function compareAssets(symbols: string[]): Promise<AnyObj> {
       leaders.push({ category: "holder_dispersion", leader: byConc[0].symbol, reason: `${byConc[0].symbol} is less concentrated (top 10: ${byConc[0].top10HoldPercent}%) than ${byConc.slice(1).map((r) => `${r.symbol} (${r.top10HoldPercent}%)`).join(", ")}.` });
     }
   }
-  return {
+  const out: AnyObj = {
     compared: rows.map((r) => r.symbol), rows, leaders,
     not_found: notFound, supported_symbols: supportedSymbols(),
     note: "Leaders are per-category and evidence-based. A leader in one category is not an overall recommendation.",
     data_timestamp: now(),
   };
+  out.summary = summarizeCompare(out);
+  return out;
 }
