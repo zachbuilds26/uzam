@@ -5,7 +5,11 @@
 
 import registryJson from "../data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "../okx/adapter.js";
-import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./provider.js";
+import {
+  fetchPage, extractPassages, BACKING_KEYWORDS, fetchNews,
+  tierOf, itemConfidence,
+} from "./provider.js";
+import type { SourceType } from "./provider.js";
 
 type RegistryAsset = {
   symbol: string;
@@ -105,6 +109,8 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
     found: true, symbol: asset.symbol, name: asset.name,
     chains: ["X Layer"], contracts: [contract],
     explorer: hit?.explorerUrl ?? `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
+    search_price: hit?.price ?? null,
+    stock_profile: advanced?.stockProfile ?? null,
     supply: info?.circSupply ? { circulating: info.circSupply } : {},
     holders_count: info?.holders ?? hit?.holders ?? null,
     holder_concentration: {
@@ -144,10 +150,12 @@ export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
     const doc = await fetchPage(url);
     if (doc.ok && doc.text) {
       fetched.push(url);
+      const st: SourceType = "official_issuer";
       for (const p of extractPassages(doc.text, BACKING_KEYWORDS)) {
         evidence.push({
           claim: "Issuer describes backing/custody/redemption on its official site.",
           source_title: doc.title, source_url: url, excerpt: p, basis: "claim",
+          source_type: st, tier: tierOf(st), confidence: itemConfidence(st), retrieved_at: now(),
         });
       }
     } else {
@@ -249,8 +257,56 @@ export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
   return risks;
 }
 
+// ---- Contradiction detection (PDF section 18): never silently pick a side ----
+export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): AnyObj[] {
+  const out: AnyObj[] = [];
+  // Check 1: underlying code — registry ("AAPL (Apple ...)") vs OKX stockProfile.
+  const expected = asset.underlying_asset.split(/[\s(]/)[0].toUpperCase();
+  const reported = onchain?.stock_profile?.stockCode ? String(onchain.stock_profile.stockCode).toUpperCase() : null;
+  if (expected && reported && expected !== reported) {
+    out.push({
+      issue: `Underlying code differs: registry says ${expected}, OKX reports ${reported}.`,
+      source_a: { name: "Uzam registry", value: asset.underlying_asset },
+      source_b: { name: "OKX advanced-info stockProfile", value: onchain.stock_profile },
+      status: "conflict",
+      recommended_action: "Review the latest issuer Final Terms / prospectus before concluding which exposure is correct.",
+    });
+  }
+  // Check 2: price consistency — OKX search quote vs price endpoint.
+  const a = Number(onchain?.search_price);
+  const b = Number(onchain?.trading_activity?.price);
+  if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+    const drift = Math.abs(a - b) / ((a + b) / 2);
+    if (drift > 0.1) {
+      out.push({
+        issue: `OKX price sources disagree by ${(drift * 100).toFixed(1)}% (search: ${a}, price endpoint: ${b}).`,
+        source_a: { name: "OKX token/search", value: a },
+        source_b: { name: "OKX market/price", value: b },
+        status: "conflict",
+        recommended_action: "Treat price as approximate; re-query before any time-sensitive use.",
+      });
+    }
+  }
+  return out;
+}
+
+// ---- Recent developments via keyless news RSS (Tier 2, never Tier 1) ----
+export async function gatherRecent(asset: RegistryAsset): Promise<{ items: AnyObj[]; note: string }> {
+  const company = asset.underlying_asset.split("(")[0].trim();
+  const { items, error } = await fetchNews(`${asset.symbol} xStocks ${company}`.slice(0, 120));
+  if (error) return { items: [], note: `News unavailable: ${error}.` };
+  const st: SourceType = "reputable_news";
+  return {
+    items: items.map((n) => ({
+      title: n.title, url: n.url, source: n.source, published_at: n.published_at,
+      source_type: st, tier: tierOf(st), confidence: itemConfidence(st), retrieved_at: now(),
+    })),
+    note: "",
+  };
+}
+
 // ---- research_asset: one-call full report ----
-export async function researchAsset(symbol: string): Promise<AnyObj> {
+export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full"): Promise<AnyObj> {
   const clean = symbol.trim().toUpperCase();
   const asset = findAsset(clean);
   if (!asset) {
@@ -260,7 +316,25 @@ export async function researchAsset(symbol: string): Promise<AnyObj> {
       supported_symbols: supportedSymbols(), confidence: "UNKNOWN", data_timestamp: now(),
     };
   }
-  const [onchain, backing] = await Promise.all([gatherOnchain(clean, asset), gatherBacking(asset)]);
+  if (focus === "issuer") {
+    return {
+      found: true, focus,
+      asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
+      issuer: { name: asset.issuer, website: asset.official_website, documents: asset.official_documents },
+      underlying: { exposure: asset.underlying_asset },
+      note: "Issuer focus: identity only, no onchain or document fetches performed.",
+      confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: "UNKNOWN" },
+      data_timestamp: now(),
+    };
+  }
+  const skipOnchain = focus === "backing";
+  const onchainStub: AnyObj = { found: true, symbol: asset.symbol, name: asset.name, chains: asset.chains, chainIds: asset.chainIds, onchain: null, missing: ["skipped_by_focus"], confidence: "UNKNOWN", data_timestamp: now() };
+  const [onchain, backing] = await Promise.all([
+    skipOnchain ? onchainStub : gatherOnchain(clean, asset),
+    gatherBacking(asset),
+  ]);
+  const recent = focus === "full" || focus === "risks" ? await gatherRecent(asset) : { items: [], note: "Skipped by focus." };
+  const contradictions = detectContradictions(asset, onchain);
   const risks = buildRisks(onchain, backing);
   const unknowns: string[] = [
     ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions : []),
@@ -268,16 +342,17 @@ export async function researchAsset(symbol: string): Promise<AnyObj> {
   ];
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
-    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`, basis: "fact" }] : []),
+    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`, basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "HIGH", retrieved_at: now() }] : []),
   ];
   const econ = onchain.trading_activity ?? {};
+  const tier1Count = evidence.filter((e) => e.tier === 1).length;
   const overall =
     onchain.onchain === null ? "LOW"
-    : onchain.confidence === "HIGH" && (backing.confidence === "MEDIUM" || backing.confidence === "LOW") ? "HIGH"
+    : onchain.confidence === "HIGH" && backing.confidence !== "UNKNOWN" && tier1Count >= 3 ? "HIGH"
     : backing.confidence === "UNKNOWN" && onchain.confidence === "LOW" ? "LOW"
     : "MEDIUM";
-  return {
-    found: true,
+  const report: AnyObj = {
+    found: true, focus,
     asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
     issuer: { name: asset.issuer, website: asset.official_website, documents: asset.official_documents },
     underlying: { exposure: asset.underlying_asset },
@@ -296,13 +371,22 @@ export async function researchAsset(symbol: string): Promise<AnyObj> {
       observations: onchain.observations ?? [], missing: onchain.missing ?? [],
     },
     risks,
-    recent_developments: [],
-    recent_note: "Web news search is not configured in the MVP — recent developments are not covered yet.",
-    contradictions: [],
+    recent_developments: recent.items,
+    ...(recent.note ? { recent_note: recent.note } : {}),
+    contradictions,
     unknowns, evidence,
     confidence: { overall, identity: "HIGH", onchain: onchain.confidence ?? "UNKNOWN", backing: backing.confidence ?? "UNKNOWN" },
     data_timestamp: now(),
   };
+  if (focus === "risks") {
+    return {
+      found: true, focus, asset: report.asset,
+      risks: report.risks, unknowns: report.unknowns, confidence: report.confidence,
+      note: "Risks focus: full data gathered, only risk sections returned.",
+      data_timestamp: report.data_timestamp,
+    };
+  }
+  return report;
 }
 
 // ---- compare_assets: structured multi-asset comparison, evidence per row ----

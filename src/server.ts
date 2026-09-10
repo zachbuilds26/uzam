@@ -349,7 +349,7 @@ const handler = createMcpHandler(() => {
       const urls = [asset.official_website, ...asset.official_documents].filter(
         (u, i, arr) => u.startsWith("http") && arr.indexOf(u) === i
       );
-      const evidence: { claim: string; source_title: string | null; source_url: string; excerpt: string; basis: string }[] = [];
+      const evidence: { claim: string; source_title: string | null; source_url: string; excerpt: string; basis: string; source_type: string; tier: number; confidence: string; retrieved_at: string }[] = [];
       const fetched: string[] = [];
       const failed: string[] = [];
       for (const url of urls.slice(0, 4)) {
@@ -363,6 +363,10 @@ const handler = createMcpHandler(() => {
               source_url: url,
               excerpt: p,
               basis: "claim",
+              source_type: "official_issuer",
+              tier: 1,
+              confidence: "MEDIUM",
+              retrieved_at: new Date().toISOString(),
             });
           }
         } else {
@@ -418,11 +422,11 @@ const handler = createMcpHandler(() => {
     "research_asset",
     {
       description:
-        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Use when the user wants to understand an asset beyond basic market data.",
-      inputSchema: z.object({ symbol: z.string() }),
+        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
+      inputSchema: z.object({ symbol: z.string(), focus: z.enum(["full", "issuer", "backing", "risks"]).optional() }),
     },
-    async ({ symbol }: { symbol: string }) => ({
-      content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol), null, 2) }],
+    async ({ symbol, focus }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks" }) => ({
+      content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full"), null, 2) }],
     })
   );
 

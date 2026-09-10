@@ -69,8 +69,7 @@ export function extractPassages(text: string, keywords: string[], maxPassages = 
   return hits;
 }
 
-export const BACKING_KEYWORDS = [
-  "back",
+export const BACKING_KEYWORDS = [  "back",
   "collateral",
   "custod",
   "reserve",
@@ -84,3 +83,75 @@ export const BACKING_KEYWORDS = [
 ];
 
 export const REDEMPTION_KEYWORDS = ["redeem", "redemption", "withdraw", "sell", "cash value", "eligible", "KYC", "fee"];
+
+// ---- Source hierarchy (PDF section 12): Tier 1 preferred, Tier 3 last resort ----
+export type SourceType =
+  | "official_issuer"
+  | "official_documentation"
+  | "legal_document"
+  | "reserve_report"
+  | "blockchain_data"
+  | "market_data"
+  | "reputable_news"
+  | "third_party";
+
+export function tierOf(sourceType: SourceType): 1 | 2 | 3 {
+  if (
+    sourceType === "official_issuer" ||
+    sourceType === "official_documentation" ||
+    sourceType === "legal_document" ||
+    sourceType === "reserve_report" ||
+    sourceType === "blockchain_data"
+  ) return 1;
+  if (sourceType === "market_data" || sourceType === "reputable_news" || sourceType === "third_party") return 2;
+  return 3;
+}
+
+// Per-item confidence from source tier (PDF section 17):
+// issuer-only claim without independent backing -> MEDIUM at best.
+export function itemConfidence(sourceType: SourceType): "HIGH" | "MEDIUM" | "LOW" {
+  if (sourceType === "blockchain_data") return "HIGH";
+  if (sourceType === "official_issuer" || sourceType === "official_documentation" || sourceType === "legal_document" || sourceType === "reserve_report") return "MEDIUM";
+  return "LOW";
+}
+
+// ---- Recent developments via Google News RSS (no API key needed) ----
+export type NewsItem = {
+  title: string;
+  url: string;
+  source: string | null;
+  published_at: string | null;
+};
+
+function decodeEntities(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
+}
+
+export async function fetchNews(query: string, maxItems = 5): Promise<{ items: NewsItem[]; error?: string }> {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (e) {
+    return { items: [], error: `news fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!res.ok) return { items: [], error: `news HTTP ${res.status}` };
+  const xml = await res.text();
+  const items: NewsItem[] = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const body = m[1];
+    const pick = (tag: string): string | null => {
+      const r = body.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+      return r ? decodeEntities(r[1]).slice(0, 300) : null;
+    };
+    const title = pick("title");
+    const link = pick("link");
+    if (!title || !link) continue;
+    items.push({ title, url: link, source: pick("source"), published_at: pick("pubDate") });
+    if (items.length >= maxItems) break;
+  }
+  return { items };
+}
