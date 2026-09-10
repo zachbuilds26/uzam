@@ -7,7 +7,7 @@ import * as z from "zod/v4";
 import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
-import { researchAsset, compareAssets } from "./research/engines.js";
+import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
 
 // ---- Fridge stock: static X Layer registry (no fake contracts, no guessing) ----
 type RegistryAsset = {
@@ -286,12 +286,17 @@ const handler = createMcpHandler(() => {
                   topHolders: top,
                 },
                 trading_activity: {
-                  price: price?.price ?? info?.price ?? hit?.price ?? null,
+                  price: fmtMoney(price?.price ?? info?.price ?? hit?.price),
+                  price_raw: price?.price ?? info?.price ?? hit?.price ?? null,
                   priceChange24H: info?.priceChange24H ?? hit?.change ?? null,
-                  volume24H: info?.volume24H ?? null,
+                  volume24H: fmtMoney(info?.volume24H),
+                  volume24H_raw: info?.volume24H ?? null,
                   txs24H: info?.txs24H ?? null,
-                  liquidity: info?.liquidity ?? hit?.liquidity ?? null,
-                  marketCap: info?.marketCap ?? hit?.marketCap ?? null,
+                  liquidity: fmtMoney(info?.liquidity ?? hit?.liquidity),
+                  liquidity_raw: info?.liquidity ?? hit?.liquidity ?? null,
+                  marketCap: fmtMoney(info?.marketCap ?? hit?.marketCap),
+                  marketCap_raw: info?.marketCap ?? hit?.marketCap ?? null,
+                  ...tradeRatios(info?.volume24H, info?.liquidity ?? hit?.liquidity, info?.marketCap ?? hit?.marketCap, info?.txs24H),
                 },
                 risk_flags: {
                   riskControlLevel: advanced?.riskControlLevel ?? null,
@@ -377,10 +382,10 @@ const handler = createMcpHandler(() => {
       }
 
       const unanswered: string[] = [];
-      const hasCustodian = evidence.some((e) => /custod/i.test(e.excerpt));
+      const namedCustodian = detectNamedCustodian(evidence.map((e) => String(e.excerpt)));
       const hasRedeem = evidence.some((e) => /redeem|redemption|cash value/i.test(e.excerpt));
       const hasReserve = evidence.some((e) => /reserve|attest|audit/i.test(e.excerpt));
-      if (!hasCustodian) unanswered.push("No custodian named on the fetched official pages.");
+      if (!namedCustodian) unanswered.push("No specific custodian named on the fetched official pages (custody arrangements are mentioned in general terms).");
       if (!hasRedeem) unanswered.push("No redemption mechanics found on the fetched official pages.");
       if (!hasReserve) unanswered.push("No reserve report or attestation linked from the fetched official pages.");
       unanswered.push("No independent (non-issuer) verification of backing gathered in MVP — treat issuer statements as CLAIM, not FACT.");
@@ -403,9 +408,11 @@ const handler = createMcpHandler(() => {
                     ? "Issuer claims the token tracks the underlying 1:1 with backing held in custody — see quoted excerpts. This is the issuer's CLAIM until independently verified."
                     : "No backing statement extracted from official pages (see unanswered_questions).",
                 backing_structure: "Tokenized-equity claim structure per issuer docs (details in evidence excerpts).",
-                custodian: hasCustodian ? "Named in evidence excerpts below." : "UNKNOWN — not stated on fetched pages.",
+                custodian: namedCustodian
+                  ? `${namedCustodian} (as named on the official page — still the issuer's claim, not independent verification).`
+                  : "UNKNOWN — pages mention custody arrangements but name no specific custodian.",
                 reserve_information: hasReserve ? "See evidence excerpts." : [],
-                summary: `${asset.symbol} backing: ${evidence.length} quoted excerpt(s) from ${fetched.length} official page(s), confidence ${confidence}. Custodian: ${hasCustodian ? "named in excerpts" : "UNKNOWN"}. ${unanswered.length} open question(s).`,
+                summary: `${asset.symbol} backing: ${evidence.length} quoted excerpt(s) from ${fetched.length} official page(s), confidence ${confidence}. Custodian: ${namedCustodian ?? "UNKNOWN"}. ${unanswered.length} open question(s).`,
                 evidence,
                 pages_read: fetched,
                 confidence,

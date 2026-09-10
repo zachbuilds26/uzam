@@ -6,7 +6,7 @@
 import registryJson from "../data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "../okx/adapter.js";
 import {
-  fetchPage, extractPassages, BACKING_KEYWORDS, fetchNews,
+  fetchPage, extractPassages, BACKING_KEYWORDS, REDEMPTION_KEYWORDS, fetchNews,
   tierOf, itemConfidence,
 } from "./provider.js";
 import type { SourceType } from "./provider.js";
@@ -152,6 +152,7 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   if (advanced?.stockProfile) observations.push(`OKX reports underlying stock profile: ${advanced.stockProfile.companyName ?? ""} (${advanced.stockProfile.stockCode ?? ""}, ${advanced.stockProfile.exchange ?? ""}). Exchange data, not issuer verification.`);
   if (missing.length > 0) observations.push(`Partial data: ${missing.length} source(s) unavailable. See missing[].`);
   if (tokenlist_check.listed) observations.push(`Independent tokenlist confirms this contract as ${tokenlist_check.matched_symbol} on X Layer — agrees with OKX.`);
+  const ratios = tradeRatios(info?.volume24H, info?.liquidity ?? hit?.liquidity, info?.marketCap ?? hit?.marketCap, info?.txs24H);
   const sourcesAgree = (price ? 1 : 0) + (info ? 1 : 0) + (advanced ? 1 : 0) >= 2;
   return {
     found: true, symbol: asset.symbol, name: asset.name,
@@ -166,15 +167,23 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
     holder_concentration: {
       top10HoldPercent: advanced?.top10HoldPercent ?? null,
       top3Percent: top.length > 0 ? Number(top3.toFixed(2)) : null,
+      float_percent: top.length > 0 ? Number((100 - top3).toFixed(2)) : null,
       topHolders: top,
     },
     trading_activity: {
-      price: price?.price ?? info?.price ?? hit?.price ?? null,
+      price: fmtMoney(price?.price ?? info?.price ?? hit?.price),
+      price_raw: price?.price ?? info?.price ?? hit?.price ?? null,
       priceChange24H: info?.priceChange24H ?? hit?.change ?? null,
-      volume24H: info?.volume24H ?? null,
+      volume24H: fmtMoney(info?.volume24H),
+      volume24H_raw: info?.volume24H ?? null,
       txs24H: info?.txs24H ?? null,
-      liquidity: info?.liquidity ?? hit?.liquidity ?? null,
-      marketCap: info?.marketCap ?? hit?.marketCap ?? null,
+      liquidity: fmtMoney(info?.liquidity ?? hit?.liquidity),
+      liquidity_raw: info?.liquidity ?? hit?.liquidity ?? null,
+      marketCap: fmtMoney(info?.marketCap ?? hit?.marketCap),
+      marketCap_raw: info?.marketCap ?? hit?.marketCap ?? null,
+      turnover_24h: ratios.turnover_24h,
+      liquidity_to_mcap: ratios.liquidity_to_mcap,
+      avg_trade_size: ratios.avg_trade_size,
     },
     risk_flags: {
       riskControlLevel: advanced?.riskControlLevel ?? null,
@@ -212,8 +221,13 @@ export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
       failed.push(`${url} (${doc.error ?? `HTTP ${doc.status}`})`);
     }
   }
+  const namedCustodian = detectNamedCustodian(evidence.map((e) => String(e.excerpt)));
+  const redemptionExcerpts = extractPassages(
+    evidence.map((e) => String(e.excerpt)).join(" "),
+    REDEMPTION_KEYWORDS, 4
+  );
   const unanswered: string[] = [];
-  if (!evidence.some((e) => /custod/i.test(String(e.excerpt)))) unanswered.push("No custodian named on the fetched official pages.");
+  if (!namedCustodian) unanswered.push("No specific custodian named on the fetched official pages (custody arrangements are mentioned in general terms).");
   if (!evidence.some((e) => /redeem|redemption|cash value/i.test(String(e.excerpt)))) unanswered.push("No redemption mechanics found on the fetched official pages.");
   if (!evidence.some((e) => /reserve|attest|audit/i.test(String(e.excerpt)))) unanswered.push("No reserve report or attestation linked from the fetched official pages.");
   unanswered.push("No independent (non-issuer) verification of backing gathered in MVP — treat issuer statements as CLAIM, not FACT.");
@@ -224,7 +238,10 @@ export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
     issuer_claim: evidence.length > 0
       ? "Issuer claims the token tracks the underlying 1:1 with backing held in custody — see quoted excerpts. CLAIM until independently verified."
       : "No backing statement extracted from official pages.",
-    custodian: evidence.some((e) => /custod/i.test(String(e.excerpt))) ? "Named in evidence excerpts." : "UNKNOWN — not stated on fetched pages.",
+    custodian: namedCustodian
+      ? `${namedCustodian} (as named on the official page — still the issuer's claim, not independent verification).`
+      : "UNKNOWN — pages mention custody arrangements but name no specific custodian.",
+    redemption_excerpts: redemptionExcerpts,
     evidence, pages_read: fetched,
     confidence: evidence.length >= 3 && fetched.length >= 2 ? "MEDIUM" : evidence.length > 0 ? "LOW" : "UNKNOWN",
     unanswered_questions: unanswered,
@@ -366,6 +383,87 @@ export async function gatherRecent(asset: RegistryAsset): Promise<{ items: AnyOb
   };
 }
 
+// ---- Shared honesty helpers ----
+
+// Money for display: 2 decimals. Raw strings stay in *_raw fields.
+export function fmtMoney(v: unknown): string | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : null;
+}
+
+// Derived market ratios from fields OKX already returns — pure arithmetic.
+export function tradeRatios(volume24H: unknown, liquidity: unknown, marketCap: unknown, txs24H: unknown): { turnover_24h: number | null; liquidity_to_mcap: number | null; avg_trade_size: string | null } {
+  const vol = Number(volume24H);
+  const liq = Number(liquidity);
+  const mc = Number(marketCap);
+  const txs = Number(txs24H);
+  return {
+    turnover_24h: Number.isFinite(vol) && Number.isFinite(liq) && liq > 0 ? Number((vol / liq).toFixed(4)) : null,
+    liquidity_to_mcap: Number.isFinite(liq) && Number.isFinite(mc) && mc > 0 ? Number((liq / mc).toFixed(4)) : null,
+    avg_trade_size: Number.isFinite(vol) && Number.isFinite(txs) && txs > 0 ? (vol / txs).toFixed(2) : null,
+  };
+}
+
+// A custodian is only "named" if an excerpt actually names an entity —
+// "regulated custody" alone names nobody. Returns the entity or null.
+export function detectNamedCustodian(excerpts: string[]): string | null {
+  const patterns = [
+    /(?:held in|in)\s+(?:regulated\s+)?custody\s+(?:by|with|through|at)\s+([A-Z][\w&.,'’\- ]{2,60})/i,
+    /([A-Z][\w&.,'’\- ]{2,60}?)\s+(?:acts?|serves?)\s+as\s+(?:the\s+)?custodian/i,
+    /custodian\s*(?:is|:)\s*([A-Z][\w&.,'’\- ]{2,60})/i,
+  ];
+  for (const p of excerpts) {
+    for (const re of patterns) {
+      const m = p.match(re);
+      if (m) return m[1].trim().replace(/[.,;:—-]+$/, "").trim();
+    }
+  }
+  return null;
+}
+
+// ---- Underlying spot price (Stooq free quote, no key) + market status ----
+type Spot = { price: number | null; date: string | null; time: string | null; error?: string };
+let spotCache: { at: number; spots: Record<string, Spot> } | null = null;
+
+export async function fetchSpot(code: string): Promise<Spot> {
+  const key = code.toUpperCase();
+  if (spotCache && Date.now() - spotCache.at < 60_000 && spotCache.spots[key]) return spotCache.spots[key];
+  const url = `https://stooq.com/q/l/?s=${key.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`;
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return { price: null, date: null, time: null, error: `spot HTTP ${res.status}` };
+    const line = (await res.text()).trim().split("\n")[1] ?? "";
+    const parts = line.split(",");
+    const close = Number(parts[6]);
+    const spot: Spot = Number.isFinite(close) && close > 0
+      ? { price: close, date: parts[1] || null, time: parts[2] || null }
+      : { price: null, date: null, time: null, error: "spot quote unparseable" };
+    spotCache = { at: Date.now(), spots: { ...(spotCache?.spots ?? {}), [key]: spot } };
+    return spot;
+  } catch (e) {
+    return { price: null, date: null, time: null, error: `spot fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+// Nasdaq hours in America/New_York: Mon–Fri 09:30–16:00. Else closed.
+export function marketStatus(at = new Date()): "open" | "closed" {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false,
+    });
+    const parts = Object.fromEntries(fmt.formatToParts(at).map((p) => [p.type, p.value]));
+    const day = parts.weekday ?? "";
+    if (day === "Sat" || day === "Sun") return "closed";
+    const mins = Number(parts.hour) * 60 + Number(parts.minute);
+    return mins >= 570 && mins < 960 ? "open" : "closed";
+  } catch {
+    return "closed";
+  }
+}
+
 // ---- Human-readable summaries: structured markdown beside the JSON ----
 // Agents get full JSON; humans (and chat answers) get this.
 const SEV_RANK: Record<string, number> = { high: 0, moderate: 1, unknown: 2, low: 3 };
@@ -443,16 +541,29 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   const recent = focus === "full" || focus === "risks" ? await gatherRecent(asset) : { items: [], note: "Skipped by focus." };
   const contradictions = detectContradictions(asset, onchain);
   const risks = buildRisks(onchain, backing);
+  const econ = onchain.trading_activity ?? {};
+  // Underlying spot + premium/discount (needs a token price; skipped otherwise).
+  const underlyingCode = asset.underlying_asset.split(/[\s(]/)[0].toUpperCase();
+  let spot: { price: number | null; date: string | null; time: string | null; error?: string } = { price: null, date: null, time: null };
+  let premiumBps: number | null = null;
+  let mktStatus: "open" | "closed" = "closed";
+  const tokenPx = Number(econ.price);
+  if (Number.isFinite(tokenPx) && tokenPx > 0 && /^[A-Z]{1,5}$/.test(underlyingCode)) {
+    spot = await fetchSpot(underlyingCode);
+    mktStatus = marketStatus();
+    if (spot.price) premiumBps = Math.round(((tokenPx - spot.price) / spot.price) * 10000);
+  }
   const unknowns: string[] = [
     ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions : []),
     ...(Array.isArray(onchain.missing) && onchain.missing.length > 0 ? [`Onchain gaps: ${onchain.missing.join("; ")}`] : []),
   ];
+  if (premiumBps !== null && mktStatus === "closed") unknowns.push(`Premium/discount (${premiumBps} bps) is measured against a stale reference — Nasdaq was closed at check time (${spot.date ?? ""} ${spot.time ?? ""} ET).`);
+  if (spot.error && tokenPx > 0) unknowns.push(`Underlying spot unavailable: ${spot.error}. No premium computed.`);
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
     ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "HIGH", retrieved_at: now() }] : []),
     ...(Array.isArray(onchain.extra_evidence) ? onchain.extra_evidence : []),
   ];
-  const econ = onchain.trading_activity ?? {};
   const tier1Count = evidence.filter((e) => e.tier === 1).length;
   const overall =
     onchain.onchain === null ? "LOW"
@@ -470,9 +581,19 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     },
     redemption: {
       note: "Confirm who can redeem, minimums, fees and settlement time in the issuer's current terms.",
+      excerpts: backing.redemption_excerpts ?? [],
+      who_can_redeem: "UNKNOWN — not confirmed from fetched pages; see excerpts and issuer terms.",
       confidence: backing.confidence,
     },
-    economics: { price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? {} },
+    economics: {
+      price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? {},
+      turnover_24h: econ.turnover_24h ?? null, liquidity_to_mcap: econ.liquidity_to_mcap ?? null,
+      underlying_price: spot.price !== null ? spot.price.toFixed(2) : null,
+      underlying_source: spot.price !== null ? "Stooq free quote (unverified third party)" : null,
+      premium_discount_bps: premiumBps,
+      underlying_market_status: spot.price !== null ? mktStatus : null,
+      reference_price_timestamp: spot.date ? `${spot.date} ${spot.time ?? ""} ET`.trim() : null,
+    },
     onchain: {
       chains: onchain.chains, contracts: onchain.contracts ?? [], holders_count: onchain.holders_count ?? null,
       holder_concentration: onchain.holder_concentration ?? {}, trading_activity: econ,
@@ -517,6 +638,11 @@ export async function compareAssets(symbols: string[]): Promise<AnyObj> {
     price: r.economics.price, marketCap: r.economics.marketCap, liquidity: r.economics.liquidity,
     holders: r.onchain.holders_count,
     top10HoldPercent: r.onchain.holder_concentration?.top10HoldPercent ?? null,
+    top3Percent: r.onchain.holder_concentration?.top3Percent ?? null,
+    float_percent: r.onchain.holder_concentration?.float_percent ?? null,
+    turnover_24h: r.economics.turnover_24h ?? null,
+    premium_discount_bps: r.economics.premium_discount_bps ?? null,
+    top_holders: (r.onchain.holder_concentration?.topHolders ?? []).slice(0, 3),
     backing_confidence: r.confidence.backing, onchain_confidence: r.confidence.onchain,
     overall_confidence: r.confidence.overall,
     open_risks: (r.risks as Risk[]).filter((x) => x.severity === "high" || x.severity === "moderate").map((x) => `${x.category} (${x.severity}): ${x.reason}`),
@@ -524,21 +650,52 @@ export async function compareAssets(symbols: string[]): Promise<AnyObj> {
   }));
   const leaders: AnyObj[] = [];
   if (rows.length > 1) {
-    const byEvidence = [...rows].sort((a, b) => (CONF_RANK[String(b.backing_confidence)] - CONF_RANK[String(a.backing_confidence)]) || (b.evidence_count - a.evidence_count));
-    leaders.push({ category: "backing_evidence", leader: byEvidence[0].symbol, reason: `${byEvidence[0].symbol} has backing confidence ${byEvidence[0].backing_confidence} with ${byEvidence[0].evidence_count} evidence items vs ${byEvidence.slice(1).map((r) => `${r.symbol} (${r.backing_confidence}, ${r.evidence_count})`).join(", ")}. Stronger here means better-documented, not safer.` });
+    const confs = new Set(rows.map((r) => String(r.backing_confidence)));
+    const counts = new Set(rows.map((r) => Number(r.evidence_count)));
+    if (confs.size === 1 && counts.size === 1) {
+      leaders.push({ category: "backing_evidence", leader: null, reason: `Tie — every compared asset scores ${rows[0].backing_confidence} with ${rows[0].evidence_count} evidence items. No leader; documentation depth is identical.` });
+    } else {
+      const byEvidence = [...rows].sort((a, b) => (CONF_RANK[String(b.backing_confidence)] - CONF_RANK[String(a.backing_confidence)]) || (b.evidence_count - a.evidence_count));
+      leaders.push({ category: "backing_evidence", leader: byEvidence[0].symbol, reason: `${byEvidence[0].symbol} has backing confidence ${byEvidence[0].backing_confidence} with ${byEvidence[0].evidence_count} evidence items vs ${byEvidence.slice(1).map((r) => `${r.symbol} (${r.backing_confidence}, ${r.evidence_count})`).join(", ")}. Stronger here means better-documented, not safer.` });
+    }
     const withLiq = rows.filter((r) => Number.isFinite(Number(r.liquidity)));
     if (withLiq.length > 1) {
       const byLiq = [...withLiq].sort((a, b) => Number(b.liquidity) - Number(a.liquidity));
-      leaders.push({ category: "liquidity", leader: byLiq[0].symbol, reason: `${byLiq[0].symbol} shows higher observed liquidity (${byLiq[0].liquidity}) than ${byLiq.slice(1).map((r) => `${r.symbol} (${r.liquidity})`).join(", ")}. Thinner books can mean larger price impact.` });
+      const withTurn = rows.filter((r) => Number.isFinite(Number(r.turnover_24h)));
+      const turnBest = withTurn.length > 0 ? [...withTurn].sort((a, b) => Number(b.turnover_24h) - Number(a.turnover_24h))[0] : null;
+      leaders.push({ category: "liquidity", leader: byLiq[0].symbol, reason: `${byLiq[0].symbol} shows higher observed liquidity (${byLiq[0].liquidity}) than ${byLiq.slice(1).map((r) => `${r.symbol} (${r.liquidity})`).join(", ")}. Thinner books can mean larger price impact.${turnBest ? ` Highest 24h turnover though: ${turnBest.symbol} at ${turnBest.turnover_24h}x — biggest pool is not always the most-traded one.` : ""}` });
     }
     const withConc = rows.filter((r) => Number.isFinite(Number(r.top10HoldPercent)));
     if (withConc.length > 1) {
-      const byConc = [...withConc].sort((a, b) => Number(a.top10HoldPercent) - Number(b.top10HoldPercent));
-      leaders.push({ category: "holder_dispersion", leader: byConc[0].symbol, reason: `${byConc[0].symbol} is less concentrated (top 10: ${byConc[0].top10HoldPercent}%) than ${byConc.slice(1).map((r) => `${r.symbol} (${r.top10HoldPercent}%)`).join(", ")}.` });
+      const by10 = [...withConc].sort((a, b) => Number(a.top10HoldPercent) - Number(b.top10HoldPercent))[0].symbol;
+      const withTop3 = rows.filter((r) => Number.isFinite(Number(r.top3Percent)));
+      const by3 = withTop3.length > 1 ? [...withTop3].sort((a, b) => Number(a.top3Percent) - Number(b.top3Percent))[0].symbol : by10;
+      if (by10 === by3) {
+        leaders.push({ category: "holder_dispersion", leader: by10, reason: `${by10} is least concentrated on both slices (top 10 and top 3) — slices agree.` });
+      } else {
+        leaders.push({ category: "holder_dispersion", leader: null, reason: `Slices disagree: top-10 says ${by10} is least concentrated, top-3 says ${by3}. No single leader — concentration depends on which slice you weight.` });
+      }
     }
   }
+  // Whale recurrence: top-holder addresses appearing across several tokens.
+  // Pattern is consistent with issuer/venue wallets — identities NOT verified.
+  const addrMap: Record<string, { symbols: string[]; maxPercent: number }> = {};
+  for (const r of rows) {
+    for (const h of (r.top_holders as AnyObj[])) {
+      const a = String(h.address ?? "");
+      if (!a) continue;
+      const cur = addrMap[a] ?? { symbols: [], maxPercent: 0 };
+      if (!cur.symbols.includes(r.symbol)) cur.symbols.push(r.symbol);
+      cur.maxPercent = Math.max(cur.maxPercent, Number(h.percent) || 0);
+      addrMap[a] = cur;
+    }
+  }
+  const shared_holders = Object.entries(addrMap)
+    .filter(([, v]) => v.symbols.length > 1)
+    .map(([address, v]) => ({ address, tokens: v.symbols, max_percent: Number(v.maxPercent.toFixed(2)), note: "Recurs as a top holder across tokens — pattern consistent with issuer/venue wallets. Identity NOT verified; do not treat as fact." }))
+    .sort((a, b) => b.tokens.length - a.tokens.length || b.max_percent - a.max_percent);
   const out: AnyObj = {
-    compared: rows.map((r) => r.symbol), rows, leaders,
+    compared: rows.map((r) => r.symbol), rows, leaders, shared_holders,
     not_found: notFound, supported_symbols: supportedSymbols(),
     note: "Leaders are per-category and evidence-based. A leader in one category is not an overall recommendation.",
     data_timestamp: now(),
