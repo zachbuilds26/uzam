@@ -49,22 +49,24 @@ async function signedFetch(
   cfg: OkxConfig,
   method: "GET" | "POST",
   path: string,
-  // For GET: query string WITHOUT leading "?". For POST: raw JSON body (or "").
-  queryOrBody: string,
-  // For POST: parsed body object to send. For GET: undefined.
+  // For GET: query string WITHOUT leading "?". For POST: ignored (body built below).
+  query: string,
+  // For POST: the payload object — stringified ONCE here so the signed bytes
+  // and the sent bytes can never diverge. For GET: undefined.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  postBody?: any
+  postBody?: any,
+  timeoutMs = 15000
 ): Promise<OkxResult> {
   const timestamp = new Date().toISOString();
-  const requestPath = method === "GET" && queryOrBody ? `${path}?${queryOrBody}` : path;
-  const body = method === "POST" ? queryOrBody : "";
+  const requestPath = method === "GET" && query ? `${path}?${query}` : path;
+  const body = method === "POST" && postBody !== undefined ? JSON.stringify(postBody) : "";
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     "OK-ACCESS-KEY": cfg.key,
     "OK-ACCESS-SIGN": signature(timestamp, method, requestPath, body, cfg.secret),
     "OK-ACCESS-TIMESTAMP": timestamp,
     "OK-ACCESS-PASSPHRASE": cfg.passphrase,
   };
+  if (method === "POST") headers["Content-Type"] = "application/json";
   if (cfg.projectId) headers["OK-ACCESS-PROJECT"] = cfg.projectId;
 
   let res: Response;
@@ -72,8 +74,8 @@ async function signedFetch(
     res = await fetch(`${BASE}${requestPath}`, {
       method,
       headers,
-      body: method === "POST" ? postBody !== undefined ? JSON.stringify(postBody) : body : undefined,
-      signal: AbortSignal.timeout(15000),
+      body: method === "POST" ? body : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
     return { ok: false, status: 0, error: `network error: ${e instanceof Error ? e.message : String(e)}` };
@@ -85,17 +87,20 @@ async function signedFetch(
   } catch {
     return { ok: false, status: res.status, error: `non-JSON response (HTTP ${res.status})` };
   }
-  if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}: ${json?.msg ?? "unknown"}` };
+  if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}: code ${json?.code ?? "?"} ${json?.msg ?? "unknown"}` };
   if (json && String(json.code) !== "0") {
     return { ok: false, status: res.status, error: `OKX code ${json.code}: ${json.msg ?? "unknown"}` };
   }
-  return { ok: true, status: res.status, data: json?.data };
+  if (json == null || json.data === undefined) {
+    return { ok: false, status: res.status, error: "missing data field in OKX response" };
+  }
+  return { ok: true, status: res.status, data: json.data };
 }
 
 export class OKXOnchainAdapter {
   constructor(private cfg: OkxConfig) {}
 
-  /** Basic tier: search by symbol on a chain (e.g. chains=196, search=AAPLx). */
+  /** Basic tier: search by symbol on a chain (e.g. chains=196, search=AAPLx). First page only. */
   async searchToken(chains: string, search: string): Promise<OkxResult> {
     const q = `chains=${encodeURIComponent(chains)}&search=${encodeURIComponent(search)}`;
     return signedFetch(this.cfg, "GET", "/api/v6/dex/market/token/search", q);
@@ -103,28 +108,28 @@ export class OKXOnchainAdapter {
 
   /** Basic tier: latest price for [{ chainIndex, tokenContractAddress }]. */
   async getPrice(items: { chainIndex: string; tokenContractAddress: string }[]): Promise<OkxResult> {
-    const body = JSON.stringify(items);
-    return signedFetch(this.cfg, "POST", "/api/v6/dex/market/price", body, items);
+    return signedFetch(this.cfg, "POST", "/api/v6/dex/market/price", "", items);
   }
 
   /** Premium tier: full trading info (holders count, liquidity, volume, txs). */
   async getPriceInfo(items: { chainIndex: string; tokenContractAddress: string }[]): Promise<OkxResult> {
-    const body = JSON.stringify(items);
-    return signedFetch(this.cfg, "POST", "/api/v6/dex/market/price-info", body, items);
+    return signedFetch(this.cfg, "POST", "/api/v6/dex/market/price-info", "", items);
   }
 
-  /** Premium tier: top holder addresses with percentages. */
+  /** Premium tier: top holder addresses with percentages. First page only (limit, no cursor). */
   async getHolders(chainIndex: string, tokenContractAddress: string, limit = "20"): Promise<OkxResult> {
+    const addr = tokenContractAddress.toLowerCase();
     const q = `chainIndex=${encodeURIComponent(chainIndex)}&tokenContractAddress=${encodeURIComponent(
-      tokenContractAddress
+      addr
     )}&limit=${encodeURIComponent(limit)}`;
     return signedFetch(this.cfg, "GET", "/api/v6/dex/market/token/holder", q);
   }
 
   /** Premium tier: stockProfile for RWA tokens, top10HoldPercent, risk flags. */
   async getAdvancedInfo(chainIndex: string, tokenContractAddress: string): Promise<OkxResult> {
+    const addr = tokenContractAddress.toLowerCase();
     const q = `chainIndex=${encodeURIComponent(chainIndex)}&tokenContractAddress=${encodeURIComponent(
-      tokenContractAddress
+      addr
     )}`;
     return signedFetch(this.cfg, "GET", "/api/v6/dex/market/token/advanced-info", q);
   }

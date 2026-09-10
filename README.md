@@ -8,7 +8,7 @@ and calls research tools. Uzam gathers and cites — the agent reasons.
 - **Live MCP:** `https://uzam.onrender.com/mcp`
 - **Health:** `https://uzam.onrender.com/health`
 - **Hackathon:** OKX Dev Day 2026 — primary track OKX AI (Agents), secondary X Layer RWA
-- **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx
+- **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx
 
 ## Tools
 
@@ -18,7 +18,7 @@ and calls research tools. Uzam gathers and cites — the agent reasons.
 | `analyze_onchain` | Contract resolution + price, supply, holders, concentration, volume, liquidity via OKX Onchain OS. Partial + `missing[]` when unavailable. |
 | `analyze_backing` | Reads issuer pages live, quotes backing passages with Tier-1 evidence, separates CLAIM from FACT. |
 | `research_asset` | Full report: identity, backing, onchain, 9-category risks, news, contradictions, unknowns, confidence. Optional `focus`: `full` / `issuer` / `backing` / `risks`. |
-| `compare_assets` | 2–4 asset table + per-category leaders with reasons. Never a bald verdict. |
+| `compare_assets` | 1–4 asset table + per-category leaders with reasons (ties reported, never forced). Never a bald verdict. |
 
 ## Research philosophy
 
@@ -40,7 +40,7 @@ curl -X POST https://uzam.onrender.com/mcp \
 
 ```bash
 npm install
-cp .env.example .env   # fill OKX_ACCESS_KEY, OKX_SECRET_KEY, OKX_PASSPHRASE
+cp .env.example .env   # fill OKX_ACCESS_KEY, OKX_SECRET_KEY, OKX_PASSPHRASE (plus OKX_PROJECT_ID if shown, ALLOWED_HOSTS on Render)
 npm run dev            # or: npm run build && npm start
 ```
 

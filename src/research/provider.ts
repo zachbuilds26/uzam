@@ -10,28 +10,59 @@ export type FetchedDoc = {
   status: number;
   title: string | null;
   text: string | null;
+  truncated?: boolean;
   error?: string;
 };
 
-function stripHtml(html: string): { title: string | null; text: string } {
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim().slice(0, 200) : null;
-  let text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+// Defense in depth: Uzam only ever fetches registry/news URLs, but enforce it
+// here too — https only, no loopback/private/link-local targets.
+function urlAllowed(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    if (h === "localhost" || h.endsWith(".localhost") || h === "[::1]" || h === "::1") return false;
+    if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function decodeEntities(s: string): string {
+  return s
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&nbsp;|&#160;|&#x[Aa]0;/g, " ")
+    .replace(/&#(\d+);/g, (_, d) => {
+      try { return String.fromCodePoint(Number(d)); } catch { return ""; }
+    })
+    .replace(/&#[Xx]([0-9A-Fa-f]+);/g, (_, h) => {
+      try { return String.fromCodePoint(parseInt(h, 16)); } catch { return ""; }
+    })
+    .replace(/&(rsquo|rdquo|ldquo|middot|copy|ndash|mdash);/g, (m) => (
+      { "&rsquo;": "'", "&rdquo;": '"', "&ldquo;": '"', "&middot;": "·", "&copy;": "©", "&ndash;": "–", "&mdash;": "—" } as Record<string, string>
+    )[m] ?? m);
+}
+
+function stripHtml(html: string): { title: string | null; text: string } {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? decodeEntities(titleMatch[1]).replace(/\s+/g, " ").trim().slice(0, 200) : null;
+  let text = html
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<(noscript|template)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+  text = decodeEntities(text).replace(/\s+/g, " ").trim();
   return { title, text };
 }
 
 export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000): Promise<FetchedDoc> {
+  if (!urlAllowed(url)) return { url, ok: false, status: 0, title: null, text: null, error: "URL blocked (https + public hosts only)" };
   let res: Response;
   try {
     res = await fetch(url, {
@@ -46,9 +77,20 @@ export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000
   if (!contentType.includes("text/html") && !contentType.includes("text/")) {
     return { url, ok: false, status: res.status, title: null, text: null, error: `unsupported content-type: ${contentType}` };
   }
-  const html = await res.text();
+  const contentLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > 2_000_000) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `page too large (${contentLength} bytes)` };
+  }
+  let html: string;
+  try {
+    html = await res.text();
+  } catch (e) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `page body unreadable: ${e instanceof Error ? e.message : String(e)}` };
+  }
   const { title, text } = stripHtml(html);
-  return { url, ok: true, status: res.status, title, text: text.slice(0, maxChars) };
+  if (text.length <= maxChars) return { url, ok: true, status: res.status, title, text, truncated: false };
+  const cut = text.lastIndexOf(". ", maxChars);
+  return { url, ok: true, status: res.status, title, text: text.slice(0, cut > maxChars * 0.5 ? cut + 1 : maxChars), truncated: true };
 }
 
 // Keep sentences containing any keyword (substring match, case-insensitive).
@@ -59,7 +101,7 @@ export function extractPassages(text: string, keywords: string[], maxPassages = 
   const hits: string[] = [];
   for (const s of sentences) {
     const clean = s.trim();
-    if (clean.length < 40 || clean.length > 600) continue;
+    if (clean.length < 25 || clean.length > 600) continue;
     const l = clean.toLowerCase();
     if (lower.some((k) => l.includes(k))) {
       if (!hits.includes(clean)) hits.push(clean);
@@ -68,8 +110,10 @@ export function extractPassages(text: string, keywords: string[], maxPassages = 
   }
   return hits;
 }
-
-export const BACKING_KEYWORDS = [  "back",
+export const BACKING_KEYWORDS = [
+  "backed",
+  "backing",
+  "backs",
   "collateral",
   "custod",
   "reserve",
@@ -84,7 +128,9 @@ export const BACKING_KEYWORDS = [  "back",
 
 export const REDEMPTION_KEYWORDS = ["redeem", "redemption", "withdraw", "sell", "cash value", "eligible", "KYC", "fee"];
 
-// ---- Source hierarchy (PDF section 12): Tier 1 preferred, Tier 3 last resort ----
+// ---- Source hierarchy: Tier 1 preferred, Tier 3 last resort ----
+// Tier 3 (blogs / aggregators / social) has no producer in this codebase yet —
+// the unreachable `return 3` below is intentional for when one is added.
 export type SourceType =
   | "official_issuer"
   | "official_documentation"
@@ -123,35 +169,41 @@ export type NewsItem = {
   published_at: string | null;
 };
 
-function decodeEntities(s: string): string {
-  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
-}
-
-export async function fetchNews(query: string, maxItems = 5): Promise<{ items: NewsItem[]; error?: string }> {
+export async function fetchNews(query: string, maxItems = 5, timeoutMs = 15000): Promise<{ items: NewsItem[]; error?: string }> {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  if (!urlAllowed(url)) return { items: [], error: "news URL blocked" };
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
-      signal: AbortSignal.timeout(15000),
+      headers: { "User-Agent": "uzam-mvp/0.1 (+research)", "Accept": "application/rss+xml" },
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
     return { items: [], error: `news fetch failed: ${e instanceof Error ? e.message : String(e)}` };
   }
   if (!res.ok) return { items: [], error: `news HTTP ${res.status}` };
-  const xml = await res.text();
+  let xml: string;
+  try {
+    xml = await res.text();
+  } catch (e) {
+    return { items: [], error: `news body unreadable: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!/<rss|<feed/i.test(xml)) return { items: [], error: "news response is not a feed" };
   const items: NewsItem[] = [];
-  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+  for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)) {
     const body = m[1];
-    const pick = (tag: string): string | null => {
-      const r = body.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-      return r ? decodeEntities(r[1]).slice(0, 300) : null;
+    if (!body) continue;
+    const pick = (tag: string, cap: number): string | null => {
+      const r = body.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}\\s*>`, "i"));
+      if (!r || !r[1]) return null;
+      return decodeEntities(r[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")).trim().slice(0, cap) || null;
     };
-    const title = pick("title");
-    const link = pick("link");
+    const title = pick("title", 300);
+    const link = pick("link", 2000);
     if (!title || !link) continue;
-    items.push({ title, url: link, source: pick("source"), published_at: pick("pubDate") });
+    items.push({ title, url: link, source: pick("source", 120), published_at: pick("pubDate", 120) });
     if (items.length >= maxItems) break;
   }
+  if (items.length === 0) return { items, error: "no news items parsed" };
   return { items };
 }
