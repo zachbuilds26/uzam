@@ -44,6 +44,32 @@ export function supportedSymbols(): string[] {
   return registry.assets.map((a) => a.symbol);
 }
 
+// ---- Independent verification: Backed xStocks tokenlist (third-party, Tier 2) ----
+// Checks the OKX-resolved contract against the public tokenlist for chain 196.
+// Cached in memory for 1h so we don't refetch ~3500 tokens per call.
+const TOKENLIST_RAW = "https://raw.githubusercontent.com/backed-fi/cowswap-xstocks-tokenlist/main/tokenlist.json";
+let tlCache: { at: number; tokens: AnyObj[] } | null = null;
+
+export async function verifyTokenlist(contract: string): Promise<{ listed: boolean; matched_symbol: string | null; error?: string }> {
+  try {
+    if (!tlCache || Date.now() - tlCache.at > 3600_000) {
+      const res = await fetch(TOKENLIST_RAW, {
+        headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) return { listed: false, matched_symbol: null, error: `tokenlist HTTP ${res.status}` };
+      const json = (await res.json()) as AnyObj;
+      tlCache = { at: Date.now(), tokens: Array.isArray(json.tokens) ? json.tokens : [] };
+    }
+    const hit = tlCache.tokens.find(
+      (t) => Number(t.chainId) === 196 && String(t.address ?? "").toLowerCase() === contract.toLowerCase()
+    );
+    return { listed: !!hit, matched_symbol: hit ? String(hit.symbol ?? "") : null };
+  } catch (e) {
+    return { listed: false, matched_symbol: null, error: `tokenlist fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 // ---- Onchain gather (same flow as analyze_onchain: search -> price -> premium) ----
 export async function gatherOnchain(clean: string, asset: RegistryAsset): Promise<AnyObj> {
   const dataTimestamp = now();
@@ -93,6 +119,27 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   if (holdRes.ok && Array.isArray(holdRes.data)) holders = holdRes.data as AnyObj[];
   else missing.push(`holders: ${holdRes.error ?? "no data (Premium tier?)"}`);
 
+  // Independent check: does the public tokenlist list this exact contract on 196?
+  const extra_evidence: AnyObj[] = [];
+  let tokenlist_check: AnyObj = { checked: false };
+  const tl = await verifyTokenlist(contract);
+  if (tl.error) {
+    missing.push(`tokenlist: ${tl.error}`);
+    tokenlist_check = { checked: false, error: tl.error };
+  } else if (tl.listed) {
+    tokenlist_check = { checked: true, listed: true, matched_symbol: tl.matched_symbol };
+    extra_evidence.push({
+      claim: "Independent tokenlist lists this exact contract on X Layer (chain 196).",
+      source_title: "xStocks Token List (Backed, CowSwap format)",
+      source_url: TOKENLIST_RAW,
+      excerpt: `Contract ${contract} is listed as ${tl.matched_symbol} on chainId 196 — agrees with the OKX-resolved contract.`,
+      basis: "fact", source_type: "third_party" as SourceType, tier: 2, confidence: "MEDIUM", retrieved_at: now(),
+    });
+  } else {
+    tokenlist_check = { checked: true, listed: false, matched_symbol: null };
+    missing.push("tokenlist: contract not found in the public xStocks tokenlist for chain 196");
+  }
+
   const top = holders
     .map((h) => ({ address: String(h.holderWalletAddress ?? ""), percent: Number(h.holdPercent ?? 0) }))
     .filter((h) => h.address && Number.isFinite(h.percent))
@@ -104,6 +151,7 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   if (top.length > 0) observations.push(`Largest holder: ${top[0].address.slice(0, 10)}… at ${top[0].percent}%. Top 3 combined: ${top3.toFixed(2)}%.`);
   if (advanced?.stockProfile) observations.push(`OKX reports underlying stock profile: ${advanced.stockProfile.companyName ?? ""} (${advanced.stockProfile.stockCode ?? ""}, ${advanced.stockProfile.exchange ?? ""}). Exchange data, not issuer verification.`);
   if (missing.length > 0) observations.push(`Partial data: ${missing.length} source(s) unavailable. See missing[].`);
+  if (tokenlist_check.listed) observations.push(`Independent tokenlist confirms this contract as ${tokenlist_check.matched_symbol} on X Layer — agrees with OKX.`);
   const sourcesAgree = (price ? 1 : 0) + (info ? 1 : 0) + (advanced ? 1 : 0) >= 2;
   return {
     found: true, symbol: asset.symbol, name: asset.name,
@@ -111,6 +159,8 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
     explorer: hit?.explorerUrl ?? `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
     search_price: hit?.price ?? null,
     stock_profile: advanced?.stockProfile ?? null,
+    tokenlist_check,
+    extra_evidence,
     supply: info?.circSupply ? { circulating: info.circSupply } : {},
     holders_count: info?.holders ?? hit?.holders ?? null,
     holder_concentration: {
@@ -287,6 +337,17 @@ export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): Any
       });
     }
   }
+  // Check 3: tokenlist symbol vs requested symbol.
+  const tl = onchain?.tokenlist_check;
+  if (tl?.checked && tl?.listed && tl?.matched_symbol && String(tl.matched_symbol).toUpperCase() !== asset.symbol.toUpperCase()) {
+    out.push({
+      issue: `Tokenlist lists this contract as ${tl.matched_symbol}, but research was requested for ${asset.symbol}.`,
+      source_a: { name: "Uzam registry / request", value: asset.symbol },
+      source_b: { name: "xStocks tokenlist (chain 196)", value: tl.matched_symbol },
+      status: "conflict",
+      recommended_action: "Do not assume these are the same product — verify the contract in the issuer's Final Terms.",
+    });
+  }
   return out;
 }
 
@@ -342,7 +403,8 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   ];
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
-    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`, basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "HIGH", retrieved_at: now() }] : []),
+    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "HIGH", retrieved_at: now() }] : []),
+    ...(Array.isArray(onchain.extra_evidence) ? onchain.extra_evidence : []),
   ];
   const econ = onchain.trading_activity ?? {};
   const tier1Count = evidence.filter((e) => e.tier === 1).length;

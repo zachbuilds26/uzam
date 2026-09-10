@@ -5,9 +5,11 @@
     "chainIndex": 196,
     "rpc": "https://rpc.xlayer.tech",
     "explorer": "https://www.okx.com/web3/explorer/xlayer",
-    "note": "EVM-compatible L2. Contracts below resolve via OKX token search on chainIndex 196 or the xStocks tokenlist. No fake addresses hardcoded."
+    "note": "EVM-compatible L2. Contracts below resolve via OKX token search on chainIndex 196 and are cross-checked against the independent xStocks tokenlist. No fake addresses hardcoded."
   },
   "tokenlist": "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+  "tokenlist_raw": "https://raw.githubusercontent.com/backed-fi/cowswap-xstocks-tokenlist/main/tokenlist.json",
+  "issuer_docs": "https://docs.xstocks.fi/docs/product-legal-overview",
   "assets": [
     {
       "symbol": "AAPLx",
@@ -21,6 +23,7 @@
       "official_website": "https://xstocks.fi/",
       "official_documents": [
         "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
         "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
       ]
     },
@@ -36,6 +39,7 @@
       "official_website": "https://xstocks.fi/",
       "official_documents": [
         "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
         "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
       ]
     },
@@ -51,6 +55,7 @@
       "official_website": "https://xstocks.fi/",
       "official_documents": [
         "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
         "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
       ]
     },
@@ -66,6 +71,71 @@
       "official_website": "https://xstocks.fi/",
       "official_documents": [
         "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "GOOGLx",
+      "name": "Alphabet xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "GOOGL (Alphabet Inc. Class A common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "MSFTx",
+      "name": "Microsoft xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "MSFT (Microsoft Corp. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "AMZNx",
+      "name": "Amazon xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "AMZN (Amazon.com Inc. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "METAx",
+      "name": "Meta xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "META (Meta Platforms Inc. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
         "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
       ]
     }
