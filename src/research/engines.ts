@@ -430,6 +430,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     onchain: {
       chains: onchain.chains, contracts: onchain.contracts ?? [], holders_count: onchain.holders_count ?? null,
       holder_concentration: onchain.holder_concentration ?? {}, trading_activity: econ,
+      tokenlist_check: onchain.tokenlist_check ?? null,
       observations: onchain.observations ?? [], missing: onchain.missing ?? [],
     },
     risks,
