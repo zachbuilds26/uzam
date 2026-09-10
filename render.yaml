@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: uzam
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: OKX_ACCESS_KEY
+        sync: false
+      - key: OKX_SECRET_KEY
+        sync: false
+      - key: OKX_PASSPHRASE
+        sync: false
+      - key: OKX_PROJECT_ID
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false

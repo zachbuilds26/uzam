@@ -1,0 +1,73 @@
+{
+  "chain": {
+    "name": "X Layer",
+    "chainId": 196,
+    "chainIndex": 196,
+    "rpc": "https://rpc.xlayer.tech",
+    "explorer": "https://www.okx.com/web3/explorer/xlayer",
+    "note": "EVM-compatible L2. Contracts below resolve via OKX token search on chainIndex 196 or the xStocks tokenlist. No fake addresses hardcoded."
+  },
+  "tokenlist": "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+  "assets": [
+    {
+      "symbol": "AAPLx",
+      "name": "Apple xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "AAPL (Apple Inc. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "TSLAx",
+      "name": "Tesla xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "TSLA (Tesla Inc. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "NVDAx",
+      "name": "Nvidia xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "NVDA (NVIDIA Corp. common stock)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    },
+    {
+      "symbol": "SPYx",
+      "name": "S&P 500 xStock",
+      "asset_type": "tokenized_etf",
+      "issuer": "xStocks / Backed Finance",
+      "underlying_asset": "SPY (SPDR S&P 500 ETF)",
+      "chains": ["X Layer"],
+      "chainIds": [196],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist"
+      ]
+    }
+  ]
+}

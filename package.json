@@ -1,0 +1,28 @@
+{
+  "name": "uzam",
+  "version": "0.1.0",
+  "description": "Uzam is an RWA intelligence MCP that gives AI agents the ability to investigate tokenized assets on X Layer using onchain data, official documents and evidence-backed research.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "zod": "^4.6.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
