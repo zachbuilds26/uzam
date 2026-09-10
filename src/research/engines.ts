@@ -428,18 +428,19 @@ let spotCache: { at: number; spots: Record<string, Spot> } | null = null;
 export async function fetchSpot(code: string): Promise<Spot> {
   const key = code.toUpperCase();
   if (spotCache && Date.now() - spotCache.at < 60_000 && spotCache.spots[key]) return spotCache.spots[key];
-  const url = `https://stooq.com/q/l/?s=${key.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${key}?interval=1d&range=5d`;
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" },
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return { price: null, date: null, time: null, error: `spot HTTP ${res.status}` };
-    const line = (await res.text()).trim().split("\n")[1] ?? "";
-    const parts = line.split(",");
-    const close = Number(parts[6]);
-    const spot: Spot = Number.isFinite(close) && close > 0
-      ? { price: close, date: parts[1] || null, time: parts[2] || null }
+    const json = (await res.json()) as AnyObj;
+    const meta = json?.chart?.result?.[0]?.meta;
+    const px = Number(meta?.regularMarketPrice);
+    const t = Number(meta?.regularMarketTime);
+    const spot: Spot = Number.isFinite(px) && px > 0
+      ? { price: px, date: t ? new Date(t * 1000).toISOString().slice(0, 10) : null, time: t ? new Date(t * 1000).toISOString().slice(11, 16) + " UTC" : null }
       : { price: null, date: null, time: null, error: "spot quote unparseable" };
     spotCache = { at: Date.now(), spots: { ...(spotCache?.spots ?? {}), [key]: spot } };
     return spot;
@@ -557,7 +558,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions : []),
     ...(Array.isArray(onchain.missing) && onchain.missing.length > 0 ? [`Onchain gaps: ${onchain.missing.join("; ")}`] : []),
   ];
-  if (premiumBps !== null && mktStatus === "closed") unknowns.push(`Premium/discount (${premiumBps} bps) is measured against a stale reference — Nasdaq was closed at check time (${spot.date ?? ""} ${spot.time ?? ""} ET).`);
+  if (premiumBps !== null && mktStatus === "closed") unknowns.push(`Premium/discount (${premiumBps} bps) is measured against a stale reference — Nasdaq was closed at check time (${spot.date ?? ""} ${spot.time ?? ""}).`);
   if (spot.error && tokenPx > 0) unknowns.push(`Underlying spot unavailable: ${spot.error}. No premium computed.`);
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
@@ -589,10 +590,10 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? {},
       turnover_24h: econ.turnover_24h ?? null, liquidity_to_mcap: econ.liquidity_to_mcap ?? null,
       underlying_price: spot.price !== null ? spot.price.toFixed(2) : null,
-      underlying_source: spot.price !== null ? "Stooq free quote (unverified third party)" : null,
+      underlying_source: spot.price !== null ? "Yahoo Finance quote (unverified third party)" : null,
       premium_discount_bps: premiumBps,
       underlying_market_status: spot.price !== null ? mktStatus : null,
-      reference_price_timestamp: spot.date ? `${spot.date} ${spot.time ?? ""} ET`.trim() : null,
+      reference_price_timestamp: spot.date ? `${spot.date} ${spot.time ?? ""}`.trim() : null,
     },
     onchain: {
       chains: onchain.chains, contracts: onchain.contracts ?? [], holders_count: onchain.holders_count ?? null,
