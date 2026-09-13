@@ -71,7 +71,34 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
     }
   }
 
-  // Paywall (if any) mounts BEFORE the handlers so it can intercept first.
+  // Parameter validation runs BEFORE the paywall: buyers must get a 400 for
+// bad input without ever seeing a payment challenge. (Review rejects services
+// that charge first and validate later.)
+const TICKER = /^[A-Za-z0-9.\-]{1,20}$/;
+
+function validatePaidBody(req: Request, res: Response, next: () => void): void {
+  if (req.method === "POST" && req.path === "/api/research") {
+    const s: unknown = req.body?.symbol;
+    if (typeof s !== "string" || s.trim().length < 1 || !TICKER.test(s.trim())) {
+      res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
+      return;
+    }
+  }
+  if (req.method === "POST" && req.path === "/api/compare") {
+    const arr: unknown = req.body?.symbols;
+    const ok =
+      Array.isArray(arr) && arr.length >= 1 && arr.length <= 4 &&
+      arr.every((x: unknown) => typeof x === "string" && x.trim().length >= 1 && TICKER.test(x.trim()));
+    if (!ok) {
+      res.status(400).json({ ok: false, error: "invalid symbols: array of 1-4 ticker strings" });
+      return;
+    }
+  }
+  next();
+}
+
+// Validation first, then paywall, then handlers — in that order.
+  app.use(validatePaidBody);
   if (paywall) app.use(paywall);
 
   const runResearch = async (req: Request, res: Response): Promise<void> => {
