@@ -52,6 +52,11 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
       await resourceServer.initialize();
       paywall = paymentMiddleware(
         {
+          "POST /api/identify": {
+            accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_RESEARCH }],
+            description: "Uzam asset identifier on X Layer: issuer, underlying, chain info and official documents.",
+            mimeType: "application/json",
+          },
           "POST /api/research": {
             accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_RESEARCH }],
             description: "Uzam full RWA research report on one X Layer tokenized stock (identity, backing evidence, onchain, risks, unknowns).",
@@ -65,7 +70,7 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
         },
         resourceServer
       ) as unknown as RequestHandler;
-      console.log(`[x402] paywall ON — research ${PRICE_RESEARCH}, compare ${PRICE_COMPARE} -> ${payTo}`);
+      console.log(`[x402] paywall ON — identify/research/compare ${PRICE_RESEARCH} -> ${payTo}`);
     } catch (e: unknown) {
       console.error("[x402] facilitator unreachable — paid routes running FREE:", e instanceof Error ? e.message : String(e));
     }
@@ -97,9 +102,12 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   next();
 }
 
-// Validation first, then paywall, then handlers — in that order.
+  // Validation first, then paywall, then handlers — in that order.
   app.use(validatePaidBody);
   if (paywall) app.use(paywall);
+
+  // Handlers: identify is now also paid ($2), like research/compare.
+  // Free tier is gone — every call goes through the paywall above.
 
   const runResearch = async (req: Request, res: Response): Promise<void> => {
     const symbol = typeof req.body?.symbol === "string" ? req.body.symbol : "";
