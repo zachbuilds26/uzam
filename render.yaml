@@ -17,5 +17,7 @@ services:
         sync: false
       - key: OKX_PROJECT_ID
         sync: false
+      - key: PAY_TO_ADDRESS
+        sync: false
       - key: ALLOWED_HOSTS
         sync: false

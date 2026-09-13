@@ -8,6 +8,7 @@ import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
 import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
+import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE } from "./payments/x402.js";
 
 // Bounded inputs: symbols are short tickers, never free text.
 const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/) });
@@ -516,6 +517,18 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", service: "uzam", transport: "streamable-http" });
 });
 
+let billing: { paid: boolean; reason: string } = { paid: false, reason: "starting" };
+
+async function main(): Promise<void> {
+// Payment routes (and paywall, when configured) register first so the error
+// handler below covers them and listen() only runs once setup is done.
+try {
+billing = await mountPaidRoutes(app);
+} catch (e: unknown) {
+console.error("[x402] setup failed — running free:", e instanceof Error ? e.message : String(e));
+billing = { paid: false, reason: "paywall setup failed" };
+}
+
 app.get("/", (_req: Request, res: Response) => {
   res.json({
     service: "uzam",
@@ -523,8 +536,21 @@ app.get("/", (_req: Request, res: Response) => {
       "Uzam is an RWA intelligence MCP for X Layer tokenized stocks. Connect an MCP client to POST /mcp.",
     mcp_endpoint: "/mcp",
     health: "/health",
+    api: {
+      identify: "POST /api/identify (free)",
+      research: `POST /api/research (${billing.paid ? `${PRICE_RESEARCH}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
+      compare: `POST /api/compare (${billing.paid ? `${PRICE_COMPARE}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
+    },
     tools: ["identify_asset", "analyze_onchain", "analyze_backing", "research_asset", "compare_assets"],
   });
+});
+
+// JSON error for anything the route handlers didn't catch (e.g. paywall init).
+// Registered last so it covers every route above.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
+  console.error("Unhandled route error:", err);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
 });
 
 const rawPort = Number(process.env.PORT ?? 3000);
@@ -536,3 +562,6 @@ srv.on("error", (e) => {
   console.error("listen failed:", e);
   process.exit(1);
 });
+}
+
+void main();
