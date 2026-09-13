@@ -13,8 +13,8 @@ import { loadOkxConfig } from "../okx/adapter.js";
 import { researchAsset, compareAssets, findAsset, supportedSymbols } from "../research/engines.js";
 
 const NETWORK = "eip155:196";
-export const PRICE_RESEARCH = "$3.00";
-export const PRICE_COMPARE = "$3.00";
+export const PRICE_RESEARCH = "$2.00";
+export const PRICE_COMPARE = "$2.00";
 
 function usage(route: string, detail: string, req: Request): void {
   const x402 = (req as unknown as Record<string, unknown>).x402 as
