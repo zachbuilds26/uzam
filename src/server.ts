@@ -8,10 +8,13 @@ import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
 import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
+import { normalizeLang, t } from "./research/i18n.js";
 import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
 
 // Bounded inputs: symbols are short tickers, never free text.
-const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/) });
+// lang is an optional ISO code (en/zh/es/fr); anything else falls back to en.
+const LangOpt = z.string().trim().toLowerCase().max(10).regex(/^[a-z]{2}(-[a-z]{2})?$/).optional();
+const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), lang: LangOpt });
 
 // ---- Fridge stock: static X Layer registry (no fake contracts, no guessing) ----
 type RegistryAsset = {
@@ -64,11 +67,12 @@ const handler = createMcpHandler(() => {
     "identify_asset",
     {
       description:
-        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents. Use this before any deeper research.",
+        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents. Optional lang: en, zh, es, fr. Use this before any deeper research.",
       inputSchema: SymbolInput,
     },
-    async ({ symbol }) => {
+    async ({ symbol, lang }) => {
       const asset = findAsset(symbol);
+      const L = (k: string): string => t(normalizeLang(lang), k);
       if (!asset) {
         const supported = registry.assets.map((a) => a.symbol);
         return {
@@ -79,8 +83,7 @@ const handler = createMcpHandler(() => {
                 {
                   found: false,
                   symbol: symbol.trim().toUpperCase(),
-                  uncertainty:
-                    "Asset not in Uzam X Layer MVP registry. Do not guess. Resolve via OKX token search on chainIndex 196 or the xStocks tokenlist.",
+                  uncertainty: L("id_unknown"),
                   supported_symbols: supported,
                   tokenlist: registry.tokenlist,
                 },
@@ -100,7 +103,7 @@ const handler = createMcpHandler(() => {
                 found: true,
                 name: asset.name,
                 symbol: asset.symbol,
-                summary: `${asset.symbol} — ${asset.name} (registry lists ${asset.asset_type} by ${asset.issuer} tracking ${asset.underlying_asset}; backing unverified — see analyze_backing). Chain ${asset.chains.join(", ")} (${asset.chainIds.join(", ")}). Official docs: ${asset.official_website}`,
+                summary: `${asset.symbol} — ${asset.name} (${asset.asset_type} · ${asset.issuer} · ${asset.underlying_asset}; ${L("id_backing_note")}). Chain ${asset.chains.join(", ")} (${asset.chainIds.join(", ")}). ${L("id_summary_of")}: ${asset.official_website}`,
                 asset_type: asset.asset_type,
                 issuer: asset.issuer,
                 issuer_legal: asset.issuer_legal ?? null,
@@ -111,7 +114,7 @@ const handler = createMcpHandler(() => {
                 contract_addresses: asset.contract_addresses,
                 contracts_note:
                   asset.contract_addresses.length === 0
-                    ? "Resolve exact contract via OKX token search (chainIndex 196) or tokenlist. No address hardcoded."
+                    ? L("id_no_contract")
                     : undefined,
                 official_website: asset.official_website,
                 official_documents: asset.official_documents,
@@ -129,11 +132,13 @@ const handler = createMcpHandler(() => {
     "analyze_onchain",
     {
       description:
-        "Analyze the blockchain side of an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx) using OKX Onchain OS: contract resolution on chain 196, price, supply, holder count, holder concentration, trading activity and liquidity. Returns partial data with an explicit missing[] list when OKX is unconfigured or unreachable. Never guesses.",
+        "Analyze the blockchain side of an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx) using OKX Onchain OS: contract resolution on chain 196, price, supply, holder count, holder concentration, trading activity and liquidity. Optional lang: en, zh, es, fr (detail sections stay English in this version). Returns partial data with an explicit missing[] list when OKX is unconfigured or unreachable. Never guesses.",
       inputSchema: SymbolInput,
     },
-    async ({ symbol }: { symbol: string }) => {
+    async ({ symbol, lang }: { symbol: string; lang?: string }) => {
       const clean = symbol.trim().toUpperCase();
+      const langCode = normalizeLang(lang);
+      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : undefined;
       const asset = findAsset(clean);
       const dataTimestamp = new Date().toISOString();
       if (!asset) {
@@ -150,6 +155,8 @@ const handler = createMcpHandler(() => {
                   supported_symbols: registry.assets.map((a) => a.symbol),
                   onchain: null,
                   missing: ["asset_identity"],
+                  lang: langCode,
+                  ...(langNote ? { lang_note: langNote } : {}),
                   confidence: "UNKNOWN",
                   data_timestamp: dataTimestamp,
                 },
@@ -176,6 +183,8 @@ const handler = createMcpHandler(() => {
                   chainIds: asset.chainIds,
                   onchain: null,
                   missing: ["okx_credentials"],
+                  lang: langCode,
+                  ...(langNote ? { lang_note: langNote } : {}),
                   setup:
                     "Create a project at https://web3.okx.com/onchainos/dev-portal/project and set OKX_ACCESS_KEY, OKX_SECRET_KEY and OKX_PASSPHRASE env vars (see .env.example). Then analyze_onchain can query chainIndex 196.",
                   confidence: "UNKNOWN",
@@ -222,6 +231,8 @@ const handler = createMcpHandler(() => {
                   contracts: [],
                   onchain: null,
                   missing,
+                  lang: langCode,
+                  ...(langNote ? { lang_note: langNote } : {}),
                   note: "No matching token found on X Layer (chainIndex 196) via OKX search. Check the xStocks tokenlist for the current contract.",
                   tokenlist: registry.tokenlist,
                   confidence: "LOW",
@@ -337,6 +348,8 @@ const handler = createMcpHandler(() => {
                 summary: `${asset.symbol} onchain (X Layer ${contract}): price ${price?.price ?? info?.price ?? "n/a"}, holders ${info?.holders ?? "n/a"}, top-10 ${advanced?.top10HoldPercent ?? "n/a"}%, liquidity ${info?.liquidity ?? "n/a"} (confidence ${confidence}${missing.length > 0 ? `, ${missing.length} source(s) missing` : ""}).`,
                 observations,
                 missing,
+                lang: langCode,
+                ...(langNote ? { lang_note: langNote } : {}),
                 confidence,
                 data_timestamp: dataTimestamp,
               },
@@ -353,11 +366,13 @@ const handler = createMcpHandler(() => {
     "analyze_backing",
     {
       description:
-        "Investigate what backs an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): fetches the issuer's official pages live, quotes backing passages as evidence, and separates issuer CLAIMs from independently verified FACTs. Returns unanswered_questions for anything not found. Never invents custodian or reserve details.",
+        "Investigate what backs an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): fetches the issuer's official pages live, quotes backing passages as evidence, and separates issuer CLAIMs from independently verified FACTs. Optional lang: en, zh, es, fr (detail sections stay English in this version). Returns unanswered_questions for anything not found. Never invents custodian or reserve details.",
       inputSchema: SymbolInput,
     },
-    async ({ symbol }: { symbol: string }) => {
+    async ({ symbol, lang }: { symbol: string; lang?: string }) => {
       const clean = symbol.trim().toUpperCase();
+      const langCode = normalizeLang(lang);
+      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : undefined;
       const asset = findAsset(clean);
       const dataTimestamp = new Date().toISOString();
       if (!asset) {
@@ -371,6 +386,8 @@ const handler = createMcpHandler(() => {
                   symbol: clean,
                   uncertainty: "Asset not in Uzam X Layer MVP registry. Do not guess.",
                   supported_symbols: registry.assets.map((a) => a.symbol),
+                  lang: langCode,
+                  ...(langNote ? { lang_note: langNote } : {}),
                   confidence: "UNKNOWN",
                   data_timestamp: dataTimestamp,
                 },
@@ -447,6 +464,8 @@ const handler = createMcpHandler(() => {
                 pages_read: fetched,
                 confidence,
                 unanswered_questions: unanswered,
+                lang: langCode,
+                ...(langNote ? { lang_note: langNote } : {}),
                 data_timestamp: dataTimestamp,
               },
               null,
@@ -462,12 +481,12 @@ const handler = createMcpHandler(() => {
     "research_asset",
     {
       description:
-        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
-      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), focus: z.enum(["full", "issuer", "backing", "risks"]).optional() }),
+        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Optional lang: en, zh, es, fr (headers/labels translated, quotes stay in original language). Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
+      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangOpt }),
     },
-    async ({ symbol, focus }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks" }) => {
+    async ({ symbol, focus, lang }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string }) => {
       try {
-        return { content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full"), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full", { lang }), null, 2) }] };
       } catch (e) {
         return { content: [{ type: "text", text: `research failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true as const };
       }
@@ -478,12 +497,12 @@ const handler = createMcpHandler(() => {
     "compare_assets",
     {
       description:
-        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Returns a structured table plus per-category leaders with reasons — never a bald recommendation.",
-      inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/)).min(1).max(4) }),
+        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Optional lang: en, zh, es, fr (headers/labels translated, quotes stay in original language). Returns a structured table plus per-category leaders with reasons — never a bald recommendation.",
+      inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/)).min(1).max(4), lang: LangOpt }),
     },
-    async ({ symbols }: { symbols: string[] }) => {
+    async ({ symbols, lang }: { symbols: string[]; lang?: string }) => {
       try {
-        return { content: [{ type: "text", text: JSON.stringify(await compareAssets(symbols), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(await compareAssets(symbols, { lang }), null, 2) }] };
       } catch (e) {
         return { content: [{ type: "text", text: `compare failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true as const };
       }

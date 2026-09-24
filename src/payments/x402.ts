@@ -127,15 +127,17 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   const runResearch = async (req: Request, res: Response): Promise<void> => {
     const symbol = typeof req.body?.symbol === "string" ? req.body.symbol : "";
     const focus = typeof req.body?.focus === "string" ? req.body.focus : "full";
+    const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
     usage("research", symbol, req);
-    const result = await researchAsset(symbol, focus === "issuer" || focus === "backing" || focus === "risks" ? focus : "full", { price: PRICE_RESEARCH });
+    const result = await researchAsset(symbol, focus === "issuer" || focus === "backing" || focus === "risks" ? focus : "full", { price: PRICE_RESEARCH, lang });
     res.json({ ok: true, data: result });
   };
 
   const runCompare = async (req: Request, res: Response): Promise<void> => {
     const symbols = Array.isArray(req.body?.symbols) ? req.body.symbols : [];
+    const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
     usage("compare", symbols.join(","), req);
-    const result = await compareAssets(symbols, { price: PRICE_COMPARE });
+    const result = await compareAssets(symbols, { price: PRICE_COMPARE, lang });
     res.json({ ok: true, data: result });
   };
 
@@ -222,11 +224,12 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   // Free capped preview: identity only, zero external fetches.
   app.get("/api/research/preview", (req: Request, res: Response) => {
     const symbol = typeof req.query.symbol === "string" ? req.query.symbol : "";
+    const lang = typeof req.query.lang === "string" ? req.query.lang : undefined;
     if (!symbol.trim() || !TICKER.test(symbol.trim())) {
       res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
       return;
     }
-    researchAsset(symbol, "issuer")
+    researchAsset(symbol, "issuer", { lang })
       .then((result) => res.json({ ok: true, preview: true, data: result }))
       .catch((e: unknown) => {
         if (!res.headersSent) res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });

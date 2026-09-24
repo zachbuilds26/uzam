@@ -9,6 +9,7 @@ import {
   fetchPage, extractPassages, BACKING_KEYWORDS, REDEMPTION_KEYWORDS, fetchNews,
   tierOf, itemConfidence,
 } from "./provider.js";
+import { normalizeLang, t, sev } from "./i18n.js";
 import type { SourceType } from "./provider.js";
 
 type RegistryAsset = {
@@ -706,8 +707,10 @@ const SEV_RANK: Record<string, number> = { high: 0, moderate: 1, unknown: 2, low
 
 export function summarizeResearch(r: AnyObj): string {
   if (r.found !== true) return `**${r.symbol ?? "?"} — not identified.** ${r.uncertainty ?? ""} Supported: ${(r.supported_symbols ?? []).join(", ")}.`;
+  const lang = normalizeLang(r.lang);
   const lines: string[] = [];
-  const t = r.onchain.trading_activity ?? {};
+  const L = (k: string): string => t(lang, k);
+  const ta = r.onchain.trading_activity ?? {};
   const conc = r.onchain.holder_concentration ?? {};
   // Verdict box: numbers first, one screen.
   lines.push(`## ${r.asset.symbol} — ${r.asset.name} (X Layer)`);
@@ -715,24 +718,24 @@ export function summarizeResearch(r: AnyObj): string {
   const premTxt = prem === null || prem === undefined
     ? "premium n/a (no underlying reference)"
     : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : "open"} reference`;
-  lines.push(`> Token **${t.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
-  lines.push(`> Holders **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · Liquidity **${t.liquidity ?? "n/a"}**`);
-  lines.push(`> Backing: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
-  lines.push(`> Overall confidence: **${r.confidence.overall}** — ${confidenceReceipt(r)}`);
-  lines.push(`> Scale: HIGH = multiple sources agree · MEDIUM = partly supported · LOW = thin or failed sources · UNKNOWN = no evidence`);
+  lines.push(`> Token **${ta.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
+  lines.push(`> ${L("lbl_holders")} **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · ${L("lbl_liquidity")} **${ta.liquidity ?? "n/a"}**`);
+  lines.push(`> ${L("lbl_backing")}: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
+  lines.push(`> ${L("lbl_overall")}: **${r.confidence.overall}** — ${confidenceReceipt(r)}`);
+  lines.push(`> ${L("scale")}`);
   const premFormula = prem !== null && prem !== undefined && r.economics?.underlying_price
-    ? `Premium = (token − underlying) / underlying, token ${t.price_raw ?? t.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
+    ? `Premium = (token − underlying) / underlying, token ${ta.price_raw ?? ta.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
     : `No premium computed (${!r.economics?.underlying_price ? "underlying spot unavailable" : "no token price"}).`;
-  lines.push(`### Premium vs reference`);
+  lines.push(`### ${L("sec_premium")}`);
   lines.push(premFormula);
-  lines.push(`### Backing`);
+  lines.push(`### ${L("sec_backing")}`);
   lines.push(`${r.backing.issuer_claim ?? "No backing statement."} (confidence ${r.backing.confidence})`);
-  lines.push(`Custodian: ${r.backing.custodian ?? "UNKNOWN"}`);
+  lines.push(`${L("lbl_custodian")}: ${r.backing.custodian ?? "UNKNOWN"}`);
   const ud = r.underlying_detail ?? {};
   const fil = ud.filings ?? {};
   const div = ud.dividend ?? {};
   if (fil.latest_10k || fil.latest_10q || fil.note || fil.holdings_url) {
-    lines.push(`### Underlying filings & dividends`);
+    lines.push(`### ${L("sec_filings")}`);
     if (fil.latest_10k) lines.push(`- Latest 10-K: ${fil.latest_10k.date} — ${fil.latest_10k.url}`);
     if (fil.latest_10q) lines.push(`- Latest 10-Q: ${fil.latest_10q.date} — ${fil.latest_10q.url}`);
     if (fil.note) lines.push(`- ${fil.note}${fil.holdings_url ? ` See: ${fil.holdings_url}` : ""}`);
@@ -741,10 +744,10 @@ export function summarizeResearch(r: AnyObj): string {
   }
   // All 9 risks, ranked — the buyer pays to see the hidden ones too.
   const risks = [...((r.risks as Risk[] | undefined) ?? [])].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
-  lines.push(`### All risks (ranked)`);
-  for (const x of risks) lines.push(`- **${x.category}** (${x.severity}): ${x.reason}`);
+  lines.push(`### ${L("sec_risks")}`);
+  for (const x of risks) lines.push(`- **${x.category}** (${sev(lang, x.severity)}): ${x.reason}`);
   // Unknowns reframed as diligence, not failure.
-  lines.push(`### What we checked / couldn't prove`);
+  lines.push(`### ${L("sec_checked")}`);
   const checked: string[] = [];
   if (Array.isArray(r.backing.pages_read) && r.backing.pages_read.length > 0) checked.push(`${r.backing.pages_read.length} official page(s)`);
   if (r.onchain.tokenlist_check?.listed) checked.push("independent tokenlist (contract confirmed)");
@@ -752,26 +755,26 @@ export function summarizeResearch(r: AnyObj): string {
   checked.push(`${covSummary.ok}/${covSummary.total} OKX endpoints`);
   if (r.economics?.underlying_price) checked.push("underlying spot");
   if (Array.isArray(r.recent_developments) && r.recent_developments.length > 0) checked.push(`${r.recent_developments.length} news item(s)`);
-  lines.push(`Checked: ${checked.join(" · ") || "registry only"}.`);
+  lines.push(`${L("lbl_checked")}: ${checked.join(" · ") || "registry only"}.`);
   const unknowns = ((r.unknowns as string[] | undefined) ?? []).slice(0, 5);
   if (unknowns.length > 0) {
-    lines.push(`Couldn't prove:`);
+    lines.push(`${L("lbl_couldnt")}:`);
     for (const u of unknowns) lines.push(`- ${u}`);
   }
   // Evidence as linked bullets with tier badges.
   const ev = ((r.evidence as AnyObj[] | undefined) ?? []).slice(0, 5);
-  lines.push(`### Key evidence`);
+  lines.push(`### ${L("sec_evidence")} ${L("ev_original")}`);
   if (ev.length === 0) lines.push(`- None captured — see unknowns.`);
   for (const e of ev) {
     const excerpt = String(e.excerpt ?? "").slice(0, 200);
     lines.push(`- [${e.source_title ?? "source"}](${e.source_url ?? "#"}) [Tier-${e.tier ?? "?"} ${e.source_type ?? ""}] — "${excerpt}"`);
   }
   const recent = ((r.recent_developments as AnyObj[] | undefined) ?? []).slice(0, 3);
-  lines.push(`### Recent developments`);
+  lines.push(`### ${L("sec_recent")}`);
   if (recent.length === 0) lines.push(`- None found${r.recent_note ? ` (${r.recent_note})` : ""}.`);
   for (const n of recent) lines.push(`- [${n.title}](${n.url ?? "#"}) (${n.source ?? "news"}${n.published_at ? `, ${n.published_at}` : ""})`);
   const contra = (r.contradictions as AnyObj[]) ?? [];
-  lines.push(`### Contradictions`);
+  lines.push(`### ${L("sec_contradictions")}`);
   if (contra.length === 0) lines.push(`- No contradictions in the 3 automated checks (underlying code, OKX price drift >10%, tokenlist symbol). Limited coverage — see unknowns.`);
   for (const c of contra) lines.push(`- CONFLICT: ${c.issue} See: ${c.recommended_action}`);
   if (r.receipt) lines.push(`\n---\n${r.receipt}`);
@@ -793,8 +796,10 @@ function confidenceReceipt(r: AnyObj): string {
 
 export function summarizeCompare(c: AnyObj): string {
   if (!c.rows || c.rows.length === 0) return `**No assets compared.** ${c.error ?? ""}`;
+  const lang = normalizeLang(c.lang);
+  const L = (k: string): string => t(lang, k);
   const lines: string[] = [];
-  lines.push(`## Comparison: ${(c.compared as string[]).join(" vs ")}`);
+  lines.push(`## ${L("cmp_title")}: ${(c.compared as string[]).join(" vs ")}`);
   lines.push(`| Asset | Price | Premium | Holders | Top 10 | Liquidity | Backing | Overall |`);
   lines.push(`|---|---|---|---|---|---|---|---|`);
   for (const r of c.rows as AnyObj[]) {
@@ -804,29 +809,29 @@ export function summarizeCompare(c: AnyObj): string {
   // Deltas in plain English — the "can't get this from raw OKX" moment.
   const rows = c.rows as AnyObj[];
   if (rows.length > 1) {
-    lines.push(`### Deltas`);
+    lines.push(`### ${L("sec_deltas")}`);
     const withPrem = rows.filter((r) => hasNum(r.premium_discount_bps));
     if (withPrem.length > 1) {
       const sorted = [...withPrem].sort((a, b) => Number(a.premium_discount_bps) - Number(b.premium_discount_bps));
       const d = Math.abs(Number(sorted[sorted.length - 1].premium_discount_bps) - Number(sorted[0].premium_discount_bps));
-      lines.push(`- Cheapest premium: ${sorted[0].symbol} (${sorted[0].premium_discount_bps} bps, ≈ ${(Number(sorted[0].premium_discount_bps) / 100).toFixed(2)}%) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].premium_discount_bps} bps) — Δ ${d} bps (≈ ${(d / 100).toFixed(2)}%).`);
+      lines.push(`- ${L("cmp_cheapest")}: ${sorted[0].symbol} (${sorted[0].premium_discount_bps} bps, ≈ ${(Number(sorted[0].premium_discount_bps) / 100).toFixed(2)}%) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].premium_discount_bps} bps) — Δ ${d} bps (≈ ${(d / 100).toFixed(2)}%).`);
     }
     const withLiq = rows.filter((r) => hasNum(r.liquidity));
     if (withLiq.length > 1) {
       const sorted = [...withLiq].sort((a, b) => Number(b.liquidity) - Number(a.liquidity));
-      lines.push(`- Most liquid: ${sorted[0].symbol} (${sorted[0].liquidity}) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].liquidity}, ${(Number(sorted[0].liquidity) / Math.max(1, Number(sorted[sorted.length - 1].liquidity))).toFixed(1)}x).`);
+      lines.push(`- ${L("cmp_liquid")}: ${sorted[0].symbol} (${sorted[0].liquidity}) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].liquidity}, ${(Number(sorted[0].liquidity) / Math.max(1, Number(sorted[sorted.length - 1].liquidity))).toFixed(1)}x).`);
     }
     const withConc = rows.filter((r) => hasNum(r.top10HoldPercent));
     if (withConc.length > 1) {
       const sorted = [...withConc].sort((a, b) => Number(a.top10HoldPercent) - Number(b.top10HoldPercent));
-      lines.push(`- Least concentrated: ${sorted[0].symbol} (top-10 ${sorted[0].top10HoldPercent}%) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].top10HoldPercent}%).`);
+      lines.push(`- ${L("cmp_dispersed")}: ${sorted[0].symbol} (top-10 ${sorted[0].top10HoldPercent}%) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].top10HoldPercent}%).`);
     }
   }
-  lines.push(`### Leaders (per category, evidence-based — not overall recommendations)`);
+  lines.push(`### ${L("sec_leaders")}`);
   for (const l of (c.leaders as AnyObj[])) lines.push(`- **${l.category}: ${l.leader ?? "tie"}** — ${l.reason}`);
   const shared = ((c.shared_holders as AnyObj[] | undefined) ?? []).slice(0, 3);
   if (shared.length > 0) {
-    lines.push(`### Shared whales (top holders recurring across tokens)`);
+    lines.push(`### ${L("sec_whales")}`);
     for (const h of shared) lines.push(`- \`${String(h.address).slice(0, 12)}…\` in ${h.tokens.join(", ")} (max ${h.max_percent}%) — consistent with issuer/venue wallets, UNVERIFIED.`);
   }
   const nf = ((c.not_found as string[] | undefined) ?? []);
@@ -836,20 +841,22 @@ export function summarizeCompare(c: AnyObj): string {
 }
 
 // ---- research_asset: one-call full report ----
-export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full", opts?: { price?: string }): Promise<AnyObj> {
+export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full", opts?: { price?: string; lang?: string }): Promise<AnyObj> {
   const t0 = Date.now();
+  const lang = normalizeLang(opts?.lang);
+  const L = (k: string): string => t(lang, k);
   const clean = symbol.trim().toUpperCase();
   const asset = findAsset(clean);
   if (!asset) {
     return {
-      found: false, symbol: clean,
-      uncertainty: "Asset not in Uzam X Layer MVP registry. Do not guess.",
+      found: false, symbol: clean, lang,
+      uncertainty: L("id_unknown"),
       supported_symbols: supportedSymbols(), confidence: "UNKNOWN", data_timestamp: now(),
     };
   }
   if (focus === "issuer") {
     return {
-      found: true, focus,
+      found: true, focus, lang,
       asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
       issuer: { name: asset.issuer, legal: asset.issuer_legal ?? null, website: asset.official_website, documents: asset.official_documents },
       underlying: { exposure: asset.underlying_asset, ...(asset.underlying ?? {}) },
@@ -939,7 +946,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     : backing.confidence === "UNKNOWN" && onchain.confidence === "LOW" ? "LOW"
     : "MEDIUM";
   const report: AnyObj = {
-    found: true, focus,
+    found: true, focus, lang,
     asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
     issuer: { name: asset.issuer, legal: asset.issuer_legal ?? null, website: asset.official_website, documents: asset.official_documents },
     underlying: { exposure: asset.underlying_asset, ...(asset.underlying ?? {}) },
@@ -989,7 +996,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   const cov = okxCoverage(missingList);
   const pages = Array.isArray(backing.pages_read) ? backing.pages_read.length : 0;
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  report.receipt = `${opts?.price ? `Paid ${opts.price}` : "Free via MCP"} · ${cov.ok}/${cov.total} OKX endpoints + ${pages} page(s) + tokenlist + spot + news in ${secs}s · data ${report.data_timestamp}`;
+  report.receipt = `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · ${cov.ok}/${cov.total} ${L("rpt_endpoints")} + ${pages} ${L("rpt_pages")} + tokenlist + spot + news ${L("rpt_in")} ${secs}s · data ${report.data_timestamp}`;
   report.summary = summarizeResearch(report);
   if (focus === "risks") {
     return {
@@ -1006,8 +1013,10 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
 // ---- compare_assets: structured multi-asset comparison, evidence per row ----
 const CONF_RANK: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1, UNKNOWN: 0 };
 
-export async function compareAssets(symbols: string[], opts?: { price?: string }): Promise<AnyObj> {
+export async function compareAssets(symbols: string[], opts?: { price?: string; lang?: string }): Promise<AnyObj> {
   const t0 = Date.now();
+  const lang = normalizeLang(opts?.lang);
+  const L = (k: string): string => t(lang, k);
   const requested = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
   const dropped = requested.slice(4);
   const list = requested.slice(0, 4);
@@ -1017,7 +1026,7 @@ export async function compareAssets(symbols: string[], opts?: { price?: string }
   const reports: AnyObj[] = [];
   for (const s of list) {
     try {
-      reports.push(await researchAsset(s));
+      reports.push(await researchAsset(s, "full", { lang }));
     } catch (e) {
       reports.push({ found: false, symbol: s, error: `research failed: ${e instanceof Error ? e.message : String(e)}`, data_timestamp: now() });
     }
@@ -1101,14 +1110,14 @@ export async function compareAssets(symbols: string[], opts?: { price?: string }
     .map(([address, v]) => ({ address, tokens: v.symbols, max_percent: Number(v.maxPercent.toFixed(2)), note: "Recurs as a top holder across tokens — pattern consistent with issuer/venue wallets. Identity NOT verified; do not treat as fact." }))
     .sort((a, b) => b.tokens.length - a.tokens.length || b.max_percent - a.max_percent);
   const out: AnyObj = {
-    compared: rows.map((r) => r.symbol), rows, leaders, shared_holders,
+    compared: rows.map((r) => r.symbol), rows, leaders, shared_holders, lang,
     ...(dropped.length > 0 ? { dropped_symbols: dropped, dropped_note: `Only the first 4 were compared; ignored: ${dropped.join(", ")}.` } : {}),
     not_found: notFound, supported_symbols: supportedSymbols(),
     note: "Leaders are per-category and evidence-based. A leader in one category is not an overall recommendation.",
     data_timestamp: now(),
   };
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  out.receipt = `${opts?.price ? `Paid ${opts.price}` : "Free via MCP"} · ${rows.length} full report(s) in ${secs}s · data ${out.data_timestamp}`;
+  out.receipt = `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · ${rows.length} ${L("rpt_reports")} ${L("rpt_in")} ${secs}s · data ${out.data_timestamp}`;
   out.summary = summarizeCompare(out);
   return out;
 }
