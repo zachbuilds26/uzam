@@ -17,7 +17,6 @@ import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_P
 // Anything outside the supported list falls back to en downstream.
 const LangReq = z.string().trim().toLowerCase().min(2).max(10).regex(/^[a-z]{2}(-[a-z]{2})?$/)
   .describe("Response language â€” ask the user to choose: en (English), zh (Chinese), es (Spanish), fr (French)");
-const LangOpt = LangReq.optional();
 const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), lang: LangReq });
 
 // ---- Fridge stock: static X Layer registry (no fake contracts, no guessing) ----
@@ -71,7 +70,7 @@ const handler = createMcpHandler(() => {
     "identify_asset",
     {
       description:
-        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents. Ask the user for lang (en, zh, es, fr) — required. Use this before any deeper research.",
+        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents. Ask the user for lang (en, zh, es, fr) ï¿½ required. Use this before any deeper research.",
       inputSchema: SymbolInput,
     },
     async ({ symbol, lang }) => {
@@ -136,7 +135,7 @@ const handler = createMcpHandler(() => {
     "analyze_onchain",
     {
       description:
-        "Analyze the blockchain side of an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx) using OKX Onchain OS: contract resolution on chain 196, price, supply, holder count, holder concentration, trading activity and liquidity. Ask the user for lang (en, zh, es, fr) — required (detail sections stay English in this version). Returns partial data with an explicit missing[] list when OKX is unconfigured or unreachable. Never guesses.",
+        "Analyze the blockchain side of an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx) using OKX Onchain OS: contract resolution on chain 196, price, supply, holder count, holder concentration, trading activity and liquidity. Ask the user for lang (en, zh, es, fr) ï¿½ required (detail sections stay English in this version). Returns partial data with an explicit missing[] list when OKX is unconfigured or unreachable. Never guesses.",
       inputSchema: SymbolInput,
     },
     async ({ symbol, lang }: { symbol: string; lang?: string }) => {
@@ -370,7 +369,7 @@ const handler = createMcpHandler(() => {
     "analyze_backing",
     {
       description:
-        "Investigate what backs an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): fetches the issuer's official pages live, quotes backing passages as evidence, and separates issuer CLAIMs from independently verified FACTs. Ask the user for lang (en, zh, es, fr) — required (detail sections stay English in this version). Returns unanswered_questions for anything not found. Never invents custodian or reserve details.",
+        "Investigate what backs an X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): fetches the issuer's official pages live, quotes backing passages as evidence, and separates issuer CLAIMs from independently verified FACTs. Ask the user for lang (en, zh, es, fr) ï¿½ required (detail sections stay English in this version). Returns unanswered_questions for anything not found. Never invents custodian or reserve details.",
       inputSchema: SymbolInput,
     },
     async ({ symbol, lang }: { symbol: string; lang?: string }) => {
@@ -485,7 +484,7 @@ const handler = createMcpHandler(() => {
     "research_asset",
     {
       description:
-        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Ask the user for lang (en, zh, es, fr) — required (headers/labels translated, quotes stay in original language). Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
+        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Ask the user for lang (en, zh, es, fr) ï¿½ required (headers/labels translated, quotes stay in original language). Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
       inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq }),
     },
     async ({ symbol, focus, lang }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string }) => {
@@ -501,7 +500,7 @@ const handler = createMcpHandler(() => {
     "compare_assets",
     {
       description:
-        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Ask the user for lang (en, zh, es, fr) — required (headers/labels translated, quotes stay in original language). Returns a structured table plus per-category leaders with reasons â€” never a bald recommendation.",
+        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Ask the user for lang (en, zh, es, fr) ï¿½ required (headers/labels translated, quotes stay in original language). Returns a structured table plus per-category leaders with reasons â€” never a bald recommendation.",
       inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/)).min(1).max(4), lang: LangReq }),
     },
     async ({ symbols, lang }: { symbols: string[]; lang?: string }) => {
