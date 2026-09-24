@@ -819,7 +819,6 @@ export function summarizeResearch(r: AnyObj): string {
   lines.push(`- Independent tokenlist (chain 196): ${r.onchain.tokenlist_check?.listed ? `confirms contract as ${r.onchain.tokenlist_check.matched_symbol}` : "contract not confirmed"}`);
   lines.push(`- Underlying spot: ${r.economics?.underlying_source ?? "unavailable"}${r.economics?.reference_price_timestamp ? ` (${r.economics.reference_price_timestamp})` : ""}`);
   lines.push(`- Grades capped by design: issuer claims alone can never exceed MEDIUM; HIGH needs multi-source agreement + tokenlist confirmation + zero contradictions.`);
-  if (r.receipt) lines.push(`\n---\n${r.receipt}`);
   return lines.join("\n");
 }
 
@@ -890,7 +889,6 @@ export function summarizeCompare(c: AnyObj): string {
   }
   const nf = ((c.not_found as string[] | undefined) ?? []);
   if (nf.length > 0) lines.push(`Not found: ${nf.join(", ")}.`);
-  if (c.receipt) lines.push(`\n---\n${c.receipt}`);
   return lines.join("\n");
 }
 
