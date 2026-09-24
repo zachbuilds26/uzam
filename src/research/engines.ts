@@ -728,6 +728,26 @@ export function summarizeResearch(r: AnyObj): string {
     : `No premium computed (${!r.economics?.underlying_price ? "underlying spot unavailable" : "no token price"}).`;
   lines.push(`### ${L("sec_premium")}`);
   lines.push(premFormula);
+  // Market activity: everything OKX already returned, finally shown.
+  const ph = r.onchain.price_history ?? null;
+  const tf = r.onchain.recent_trades ?? null;
+  const pb = r.onchain.pools ?? null;
+  if (ph || tf || pb || ta.turnover_24h != null) {
+    lines.push(`### ${L("sec_activity")}`);
+    if (ph) lines.push(`- 30d range: low **${ph.low}** / high **${ph.high}** (${ph.points} daily candles, ${ph.change_pct ?? "n/a"}% change).`);
+    if (tf && (tf.buys + tf.sells) > 0) {
+      lines.push(`- Recent swaps: **${tf.buys} buys / ${tf.sells} sells** in last ${tf.sampled}.`);
+      for (const s of (tf.latest ?? []).slice(0, 5)) {
+        lines.push(`  - ${s.side ?? "?"} ${s.size ?? "?"} @ ${s.price ?? "?"}${s.dex ? ` via ${s.dex}` : ""}${s.tx ? ` (${String(s.tx).slice(0, 12)}…)` : ""}`);
+      }
+    }
+    if (pb && (pb.pools ?? []).length > 0) {
+      lines.push(`- Pools (${pb.pools.length}): ${pb.pools.map((p: AnyObj) => `${p.label} ($${p.liquidity_usd ?? "?"})`).join(" · ")}${pb.total_liquidity_usd ? ` — total $${pb.total_liquidity_usd}` : ""}.`);
+    }
+    if (ta.turnover_24h != null || ta.liquidity_to_mcap != null || ta.avg_trade_size != null) {
+      lines.push(`- Turnover 24h: **${ta.turnover_24h ?? "n/a"}x** · Liquidity/mcap: **${ta.liquidity_to_mcap ?? "n/a"}** · Avg trade: **${ta.avg_trade_size ? `$${ta.avg_trade_size}` : "n/a"}** · Txs 24h: **${ta.txs24H ?? "n/a"}** · Volume 24h: **$${ta.volume24H_raw ?? "n/a"}** · Mcap: **$${ta.marketCap_raw ?? "n/a"}**.`);
+    }
+  }
   lines.push(`### ${L("sec_backing")}`);
   lines.push(`${r.backing.issuer_claim ?? "No backing statement."} (confidence ${r.backing.confidence})`);
   lines.push(`${L("lbl_custodian")}: ${r.backing.custodian ?? "UNKNOWN"}`);
@@ -741,6 +761,19 @@ export function summarizeResearch(r: AnyObj): string {
     if (fil.note) lines.push(`- ${fil.note}${fil.holdings_url ? ` See: ${fil.holdings_url}` : ""}`);
     if (div.underlying_last_amount) lines.push(`- Underlying last dividend: ${div.underlying_last_amount} on ${div.underlying_last_date ?? "unknown date"} (underlying stock — xStock passthrough: ${div.xstock_treatment ?? "UNKNOWN"}).`);
     else if (!div.skipped) lines.push(`- No underlying dividend in last 12m of history. xStock passthrough treatment: UNKNOWN — confirm in Final Terms.`);
+  }
+  // Exit & redemption: the "how do I get out" section buyers actually need.
+  const red = r.redemption ?? {};
+  const redEx: string[] = Array.isArray(red.excerpts) ? red.excerpts : [];
+  const geoEx: string[] = Array.isArray(red.geo_excerpts) ? red.geo_excerpts : [];
+  const attL: string[] = Array.isArray(red.attestation_links) ? red.attestation_links : [];
+  if (redEx.length > 0 || geoEx.length > 0 || attL.length > 0 || red.who_can_redeem) {
+    lines.push(`### ${L("sec_exit")}`);
+    lines.push(`- Who can redeem: **${red.who_can_redeem ?? "UNKNOWN"}**`);
+    for (const e of redEx.slice(0, 4)) lines.push(`- "${String(e).slice(0, 220)}"`);
+    for (const g of geoEx.slice(0, 4)) lines.push(`- Eligibility: "${String(g).slice(0, 220)}"`);
+    if (attL.length > 0) for (const a of attL) lines.push(`- Attestation: ${a}`);
+    else lines.push(`- No reserve attestation link found on fetched pages.`);
   }
   // All 9 risks, ranked — the buyer pays to see the hidden ones too.
   const risks = [...((r.risks as Risk[] | undefined) ?? [])].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
@@ -756,13 +789,13 @@ export function summarizeResearch(r: AnyObj): string {
   if (r.economics?.underlying_price) checked.push("underlying spot");
   if (Array.isArray(r.recent_developments) && r.recent_developments.length > 0) checked.push(`${r.recent_developments.length} news item(s)`);
   lines.push(`${L("lbl_checked")}: ${checked.join(" · ") || "registry only"}.`);
-  const unknowns = ((r.unknowns as string[] | undefined) ?? []).slice(0, 5);
+  const unknowns = ((r.unknowns as string[] | undefined) ?? []);
   if (unknowns.length > 0) {
     lines.push(`${L("lbl_couldnt")}:`);
     for (const u of unknowns) lines.push(`- ${u}`);
   }
   // Evidence as linked bullets with tier badges.
-  const ev = ((r.evidence as AnyObj[] | undefined) ?? []).slice(0, 5);
+  const ev = ((r.evidence as AnyObj[] | undefined) ?? []).slice(0, 8);
   lines.push(`### ${L("sec_evidence")} ${L("ev_original")}`);
   if (ev.length === 0) lines.push(`- None captured — see unknowns.`);
   for (const e of ev) {
@@ -777,8 +810,22 @@ export function summarizeResearch(r: AnyObj): string {
   lines.push(`### ${L("sec_contradictions")}`);
   if (contra.length === 0) lines.push(`- No contradictions in the 3 automated checks (underlying code, OKX price drift >10%, tokenlist symbol). Limited coverage — see unknowns.`);
   for (const c of contra) lines.push(`- CONFLICT: ${c.issue} See: ${c.recommended_action}`);
+  // Methodology: what was consulted, so the report is auditable.
+  lines.push(`### ${L("sec_method")}`);
+  lines.push(`- ${covSummary.ok}/${covSummary.total} OKX Onchain OS endpoints (chain 196) · ${dataTs(r)}`);
+  if (Array.isArray(r.backing.pages_read) && r.backing.pages_read.length > 0) {
+    lines.push(`- ${r.backing.pages_read.length} official page(s): ${r.backing.pages_read.join(" · ")}`);
+  }
+  lines.push(`- Independent tokenlist (chain 196): ${r.onchain.tokenlist_check?.listed ? `confirms contract as ${r.onchain.tokenlist_check.matched_symbol}` : "contract not confirmed"}`);
+  lines.push(`- Underlying spot: ${r.economics?.underlying_source ?? "unavailable"}${r.economics?.reference_price_timestamp ? ` (${r.economics.reference_price_timestamp})` : ""}`);
+  lines.push(`- Grades capped by design: issuer claims alone can never exceed MEDIUM; HIGH needs multi-source agreement + tokenlist confirmation + zero contradictions.`);
   if (r.receipt) lines.push(`\n---\n${r.receipt}`);
   return lines.join("\n");
+}
+
+// Report timestamp helper (single data clock for the methodology section).
+function dataTs(r: AnyObj): string {
+  return String(r.data_timestamp ?? "unknown time");
 }
 
 // One-line derivation of the overall confidence from fields already computed.
@@ -829,6 +876,13 @@ export function summarizeCompare(c: AnyObj): string {
   }
   lines.push(`### ${L("sec_leaders")}`);
   for (const l of (c.leaders as AnyObj[])) lines.push(`- **${l.category}: ${l.leader ?? "tie"}** — ${l.reason}`);
+  const withRange = rows.filter((r) => r.range_30d && r.range_30d.low);
+  if (withRange.length > 0) {
+    lines.push(`### ${L("sec_activity")}`);
+    for (const r of withRange) {
+      lines.push(`- ${r.symbol} 30d: low **${r.range_30d.low}** / high **${r.range_30d.high}** (${r.range_30d.change_pct ?? "n/a"}% change) · turnover **${r.turnover_24h ?? "n/a"}x**.`);
+    }
+  }
   const shared = ((c.shared_holders as AnyObj[] | undefined) ?? []).slice(0, 3);
   if (shared.length > 0) {
     lines.push(`### ${L("sec_whales")}`);
@@ -970,7 +1024,8 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     },
     economics: {
       price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? {},
-      turnover_24h: econ.turnover_24h ?? null, liquidity_to_mcap: econ.liquidity_to_mcap ?? null,
+      turnover_24h: econ.turnover_24h ?? null, liquidity_to_mcap: econ.liquidity_to_mcap ?? null, avg_trade_size: econ.avg_trade_size ?? null,
+      range_30d: onchain.price_history ?? null,
       underlying_price: spot.price !== null ? spot.price.toFixed(2) : null,
       underlying_source: spot.price !== null ? "Yahoo Finance quote (unverified third party)" : null,
       premium_discount_bps: premiumBps,
@@ -980,6 +1035,9 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     onchain: {
       chains: onchain.chains, contracts: onchain.contracts ?? [], holders_count: onchain.holders_count ?? null,
       holder_concentration: onchain.holder_concentration ?? {}, trading_activity: econ,
+      price_history: onchain.price_history ?? null,
+      recent_trades: onchain.recent_trades ?? null,
+      pools: onchain.pools ?? null,
       tokenlist_check: onchain.tokenlist_check ?? null,
       observations: onchain.observations ?? [], missing: onchain.missing ?? [],
     },
@@ -1043,6 +1101,7 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
     remainder_after_top3: r.onchain.holder_concentration?.remainder_after_top3 ?? null,
     turnover_24h: r.economics.turnover_24h ?? null,
     premium_discount_bps: r.economics.premium_discount_bps ?? null,
+    range_30d: r.economics.range_30d ?? null,
     top_holders: (r.onchain.holder_concentration?.topHolders ?? []).slice(0, 3),
     backing_confidence: r.confidence.backing, onchain_confidence: r.confidence.onchain,
     overall_confidence: r.confidence.overall,
