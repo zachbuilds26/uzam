@@ -19,7 +19,9 @@ type RegistryAsset = {
   name: string;
   asset_type: string;
   issuer: string;
+  issuer_legal?: string;
   underlying_asset: string;
+  underlying?: { ticker: string; exchange: string; cik: string | null; sec_filings: string };
   chains: string[];
   chainIds: number[];
   contract_addresses: string[];
@@ -34,7 +36,8 @@ const registry = z.object({
   issuer_docs: z.string().optional(),
   assets: z.array(z.object({
     symbol: z.string(), name: z.string(), asset_type: z.string(),
-    issuer: z.string(), underlying_asset: z.string(),
+    issuer: z.string(), issuer_legal: z.string().optional(), underlying_asset: z.string(),
+    underlying: z.object({ ticker: z.string(), exchange: z.string(), cik: z.string().nullable(), sec_filings: z.string() }).optional(),
     chains: z.array(z.string()), chainIds: z.array(z.number()),
     contract_addresses: z.array(z.string()),
     official_website: z.string(), official_documents: z.array(z.string()),
@@ -100,7 +103,9 @@ const handler = createMcpHandler(() => {
                 summary: `${asset.symbol} — ${asset.name} (registry lists ${asset.asset_type} by ${asset.issuer} tracking ${asset.underlying_asset}; backing unverified — see analyze_backing). Chain ${asset.chains.join(", ")} (${asset.chainIds.join(", ")}). Official docs: ${asset.official_website}`,
                 asset_type: asset.asset_type,
                 issuer: asset.issuer,
+                issuer_legal: asset.issuer_legal ?? null,
                 underlying_asset: asset.underlying_asset,
+                underlying: asset.underlying ?? null,
                 chains: asset.chains,
                 chainIds: asset.chainIds,
                 contract_addresses: asset.contract_addresses,
@@ -538,8 +543,12 @@ app.get("/", (_req: Request, res: Response) => {
     health: "/health",
     api: {
       identify: "POST /api/identify (free)",
+      preview: "GET /api/research/preview?symbol=AAPLx (free)",
       research: `POST /api/research (${billing.paid ? `${PRICE_RESEARCH}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
       compare: `POST /api/compare (${billing.paid ? `${PRICE_COMPARE}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
+      receipts: "GET /api/receipts (free)",
+      install: "GET /install (free MCP setup snippet)",
+      pricing: "GET /.well-known/x402 (free)",
     },
     tools: ["identify_asset", "analyze_onchain", "analyze_backing", "research_asset", "compare_assets"],
   });

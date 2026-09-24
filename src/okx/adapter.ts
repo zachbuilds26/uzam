@@ -8,6 +8,11 @@
 // Auth: OK-ACCESS-KEY / SIGN / TIMESTAMP / PASSPHRASE (+ PROJECT if set).
 // Sign = Base64(HMAC_SHA256(timestamp + METHOD + requestPath + body, secret)).
 // The rest of Uzam never touches OKX directly — it calls this adapter.
+//
+// Tier note: search/price/candles/trades/top-liquidity/basic-info are Basic;
+// price-info/holder/advanced-info/historical-candles are Premium. A Basic-only
+// key gets HTTP 402 or a permission error on Premium calls — the adapter
+// surfaces those as `missing[]` entries, never crashes.
 
 import { createHmac } from "node:crypto";
 
@@ -132,5 +137,37 @@ export class OKXOnchainAdapter {
       addr
     )}`;
     return signedFetch(this.cfg, "GET", "/api/v6/dex/market/token/advanced-info", q);
+  }
+
+  /** Basic tier: OHLCV candles. bar e.g. "1Dutc" (daily), "1H", "4H". limit <= 100. */
+  async getCandles(chainIndex: string, tokenContractAddress: string, bar = "1Dutc", limit = "30"): Promise<OkxResult> {
+    const addr = tokenContractAddress.toLowerCase();
+    const q = `chainIndex=${encodeURIComponent(chainIndex)}&tokenContractAddress=${encodeURIComponent(
+      addr
+    )}&bar=${encodeURIComponent(bar)}&limit=${encodeURIComponent(limit)}`;
+    return signedFetch(this.cfg, "GET", "/api/v6/dex/market/candles", q);
+  }
+
+  /** Basic tier: recent trades (side, size, price, dex, tx hash). limit <= 100. */
+  async getTrades(chainIndex: string, tokenContractAddress: string, limit = "20"): Promise<OkxResult> {
+    const addr = tokenContractAddress.toLowerCase();
+    const q = `chainIndex=${encodeURIComponent(chainIndex)}&tokenContractAddress=${encodeURIComponent(
+      addr
+    )}&limit=${encodeURIComponent(limit)}`;
+    return signedFetch(this.cfg, "GET", "/api/v6/dex/market/trades", q);
+  }
+
+  /** Basic tier: top-5 liquidity pools (protocol, USD liquidity, fee). No paging. */
+  async getTopLiquidity(chainIndex: string, tokenContractAddress: string): Promise<OkxResult> {
+    const addr = tokenContractAddress.toLowerCase();
+    const q = `chainIndex=${encodeURIComponent(chainIndex)}&tokenContractAddress=${encodeURIComponent(
+      addr
+    )}`;
+    return signedFetch(this.cfg, "GET", "/api/v6/dex/market/token/top-liquidity", q);
+  }
+
+  /** Basic tier: token metadata cards (name/symbol/decimals/logo), batched. */
+  async getBasicInfo(items: { chainIndex: string; tokenContractAddress: string }[]): Promise<OkxResult> {
+    return signedFetch(this.cfg, "POST", "/api/v6/dex/market/token/basic-info", "", items);
   }
 }

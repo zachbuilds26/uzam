@@ -3,6 +3,11 @@
 // text, and pull out passages matching finance keywords. No search API key
 // needed, no vector database. Whatever the page says becomes quoted evidence —
 // Uzam never invents backing details.
+// PDFs (prospectuses, Final Terms, attestations) are parsed with a tiny
+// built-in extractor (node:zlib inflate + text-object scan) — no native deps,
+// Render-safe. Scanned/image-only PDFs yield no text and are reported honestly.
+
+import { inflateSync } from "node:zlib";
 
 export type FetchedDoc = {
   url: string;
@@ -74,6 +79,8 @@ export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000
   }
   if (!res.ok) return { url, ok: false, status: res.status, title: null, text: null, error: `HTTP ${res.status}` };
   const contentType = res.headers.get("content-type") ?? "";
+  const isPdf = contentType.includes("application/pdf") || /\.pdf(\?|#|$)/i.test(url);
+  if (isPdf) return fetchPdf(url, res, maxChars);
   if (!contentType.includes("text/html") && !contentType.includes("text/")) {
     return { url, ok: false, status: res.status, title: null, text: null, error: `unsupported content-type: ${contentType}` };
   }
@@ -88,6 +95,81 @@ export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000
     return { url, ok: false, status: res.status, title: null, text: null, error: `page body unreadable: ${e instanceof Error ? e.message : String(e)}` };
   }
   const { title, text } = stripHtml(html);
+  if (text.length <= maxChars) return { url, ok: true, status: res.status, title, text, truncated: false };
+  const cut = text.lastIndexOf(". ", maxChars);
+  return { url, ok: true, status: res.status, title, text: text.slice(0, cut > maxChars * 0.5 ? cut + 1 : maxChars), truncated: true };
+}
+
+// ---- PDF text extraction (zero dependencies) ----
+// Most prospectuses are text-based PDFs with FlateDecode streams.
+// We inflate each stream and scan for PDF text objects: (literal) and <hex>.
+// Image-only (scanned) PDFs yield nothing — reported honestly, never faked.
+function pdfStreamText(raw: Buffer): string {
+  const parts: string[] = [];
+  const push = (s: string): void => {
+    const clean = s.replace(/\s+/g, " ").trim();
+    if (clean.length > 2) parts.push(clean);
+  };
+  const scanText = (chunk: string): void => {
+    // Literal strings: ( ... ) with \( \) \\ escapes. Skip font-encoding junk.
+    for (const m of chunk.matchAll(/\((?:\\.|[^\\()])*\)/g)) {
+      const inner = m[0].slice(1, -1)
+        .replace(/\\([nrtbf()\\])/g, (_, c: string) => ({ n: "\n", r: " ", t: " ", b: " ", f: " ", "(": "(", ")": ")", "\\": "\\" }[c] ?? " "))
+        .replace(/\\[0-7]{1,3}/g, " ");
+      if (/[a-zA-Z0-9]{3,}/.test(inner)) push(decodeEntities(inner));
+    }
+    // Hex strings: <48656c6c6f> — only plausible text runs (has spaces 0x20).
+    for (const m of chunk.matchAll(/<([0-9A-Fa-f\s]{8,400})>/g)) {
+      const hex = m[1].replace(/\s+/g, "");
+      if (hex.length % 2 !== 0 || !/20/.test(hex)) continue;
+      try {
+        const buf = Buffer.from(hex, "hex");
+        if (buf.includes(0)) continue; // likely UTF-16 without BOM handling — skip
+        const s = buf.toString("latin1");
+        if (/[a-zA-Z0-9]{3,}/.test(s) && /^[\x20-\x7E\s]+$/.test(s)) push(s);
+      } catch { /* ignore malformed hex */ }
+    }
+  };
+  const bin = raw.toString("latin1");
+  const streams = [...bin.matchAll(/stream\r?\n([\s\S]*?)endstream/g)];
+  if (streams.length === 0) {
+    scanText(bin);
+  } else {
+    for (const s of streams) {
+      const bytes = Buffer.from(s[1], "latin1");
+      try {
+        scanText(inflateSync(bytes).toString("latin1"));
+      } catch {
+        scanText(s[1]); // uncompressed stream — scan raw
+      }
+      if (parts.join(" ").length > 60000) break;
+    }
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+async function fetchPdf(url: string, res: Response, maxChars: number): Promise<FetchedDoc> {
+  const contentLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > 8_000_000) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `PDF too large (${contentLength} bytes)` };
+  }
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `PDF body unreadable: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (buf.length > 8_000_000) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `PDF too large (${buf.length} bytes)` };
+  }
+  if (buf.subarray(0, 5).toString() !== "%PDF-") {
+    return { url, ok: false, status: res.status, title: null, text: null, error: "not a PDF file" };
+  }
+  const text = pdfStreamText(buf);
+  if (text.length < 200) {
+    return { url, ok: false, status: res.status, title: "PDF", text: null, error: "PDF has no extractable text (likely scanned images)" };
+  }
+  const title = url.split("/").pop()?.replace(/[-_+.]+/g, " ").slice(0, 200) ?? "PDF document";
   if (text.length <= maxChars) return { url, ok: true, status: res.status, title, text, truncated: false };
   const cut = text.lastIndexOf(". ", maxChars);
   return { url, ok: true, status: res.status, title, text: text.slice(0, cut > maxChars * 0.5 ? cut + 1 : maxChars), truncated: true };
