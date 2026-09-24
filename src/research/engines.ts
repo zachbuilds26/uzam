@@ -434,17 +434,26 @@ export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): Any
 }
 
 // ---- Recent developments via keyless news RSS (Tier 2, never Tier 1) ----
+// Filler filter: RSS search returns price-converter/calculator pages
+// ("Convert 50 USD to NVDAX", "NVDAX to INR Live Price") which are not news.
+// Those are dropped; if everything drops we say so instead of showing filler.
+const NEWS_FILLER = /convert \d+|calculator|live price|price today|price prediction|price forecast|converter|how much is|worth today/i;
+
 export async function gatherRecent(asset: RegistryAsset): Promise<{ items: AnyObj[]; note: string }> {
   const company = asset.underlying_asset.split("(")[0].trim();
   const { items, error } = await fetchNews(`${asset.symbol} xStocks ${company}`.slice(0, 120));
   if (error) return { items: [], note: `News unavailable: ${error}.` };
   const st: SourceType = "reputable_news";
+  const real = items.filter((n) => !NEWS_FILLER.test(`${n.title} ${n.url}`));
+  const dropped = items.length - real.length;
   return {
-    items: items.map((n) => ({
+    items: real.map((n) => ({
       title: n.title, url: n.url, source: n.source, published_at: n.published_at,
       source_type: st, tier: tierOf(st), confidence: itemConfidence(st), retrieved_at: now(),
     })),
-    note: "",
+    note: dropped > 0 && real.length === 0
+      ? `News search returned only price-converter pages (${dropped} excluded as filler).`
+      : dropped > 0 ? `${dropped} converter page(s) excluded as filler.` : "",
   };
 }
 
@@ -474,6 +483,21 @@ export function pct(v: unknown): string {
 export function fmtMoney(v: unknown): string | null {
   const n = toNum(v);
   return n === null ? null : n.toFixed(2);
+}
+
+// ---- Shared OKX coverage counter: ONE definition, used by receipt,
+// verdict box and unknowns alike so the numbers can never disagree.
+// The 7 counted endpoints are the data calls; token_search/tokenlist are
+// resolution steps and are reported separately in missing[], not here.
+const OKX_CORE = ["price", "price_info", "advanced_info", "holders", "candles", "trades", "pools"];
+
+export function okxCoverage(missing: unknown): { ok: number; total: number } {
+  const total = OKX_CORE.length;
+  if (!Array.isArray(missing)) return { ok: total, total };
+  // No credentials, no identity, or no contract = no data call was possible.
+  if (missing.includes("skipped_by_focus") || missing.includes("okx_credentials") || missing.includes("asset_identity") || missing.includes("contract_on_xlayer")) return { ok: 0, total };
+  const failed = new Set(missing.map((m) => String(m).split(":")[0].trim()));
+  return { ok: OKX_CORE.filter((k) => !failed.has(k)).length, total };
 }
 
 // ---- Candle / trade / pool summarizers (defensive: array-row or object rows) ----
@@ -723,8 +747,8 @@ export function summarizeResearch(r: AnyObj): string {
   const checked: string[] = [];
   if (Array.isArray(r.backing.pages_read) && r.backing.pages_read.length > 0) checked.push(`${r.backing.pages_read.length} official page(s)`);
   if (r.onchain.tokenlist_check?.listed) checked.push("independent tokenlist (contract confirmed)");
-  const missingCount = Array.isArray(r.onchain.missing) ? r.onchain.missing.length : 0;
-  checked.push(`${Math.max(0, 7 - missingCount)}/7 OKX endpoints`);
+  const covSummary = okxCoverage(r.onchain?.missing);
+  checked.push(`${covSummary.ok}/${covSummary.total} OKX endpoints`);
   if (r.economics?.underlying_price) checked.push("underlying spot");
   if (Array.isArray(r.recent_developments) && r.recent_developments.length > 0) checked.push(`${r.recent_developments.length} news item(s)`);
   lines.push(`Checked: ${checked.join(" · ") || "registry only"}.`);
@@ -756,8 +780,8 @@ export function summarizeResearch(r: AnyObj): string {
 // One-line derivation of the overall confidence from fields already computed.
 function confidenceReceipt(r: AnyObj): string {
   const bits: string[] = [];
-  const missingCount = Array.isArray(r.onchain?.missing) ? r.onchain.missing.length : 0;
-  bits.push(missingCount === 0 ? "all OKX endpoints agree" : `${Math.max(0, 4 - missingCount)}/4 OKX endpoints`);
+  const cov = okxCoverage(r.onchain?.missing);
+  bits.push(cov.ok === cov.total ? "all OKX endpoints agree" : `${cov.ok}/${cov.total} OKX endpoints`);
   if (r.onchain?.tokenlist_check?.listed) bits.push("tokenlist confirms contract");
   const pages = Array.isArray(r.backing?.pages_read) ? r.backing.pages_read.length : 0;
   if (pages > 0) bits.push(`${pages} official page(s) read`);
@@ -960,12 +984,10 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   };
   // Receipt footer: prove the work. Sources counted from what actually ran.
   const missingList: string[] = Array.isArray(onchain.missing) ? onchain.missing : [];
-  const okxCalls = missingList.includes("skipped_by_focus")
-    ? 0
-    : 7 - missingList.filter((m: string) => /^(price|price_info|advanced_info|holders|candles|trades|pools|token_search|tokenlist)[: ]/.test(m)).length;
+  const cov = okxCoverage(missingList);
   const pages = Array.isArray(backing.pages_read) ? backing.pages_read.length : 0;
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  report.receipt = `Paid ${opts?.price ?? "free via MCP"} · ${okxCalls} OKX calls + ${pages} page(s) + tokenlist + spot + news in ${secs}s · data ${report.data_timestamp} · re-query: {"symbol":"${asset.symbol}"}`;
+  report.receipt = `Paid ${opts?.price ?? "free via MCP"} · ${cov.ok}/${cov.total} OKX endpoints + ${pages} page(s) + tokenlist + spot + news in ${secs}s · data ${report.data_timestamp} · re-query: {"symbol":"${asset.symbol}"}`;
   report.summary = summarizeResearch(report);
   if (focus === "risks") {
     return {

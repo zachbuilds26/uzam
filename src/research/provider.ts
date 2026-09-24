@@ -177,6 +177,17 @@ async function fetchPdf(url: string, res: Response, maxChars: number): Promise<F
 
 // Keep sentences containing any keyword (substring match, case-insensitive).
 // Returns up to maxPassages short excerpts — these become quoted evidence.
+// Nav/marketing blobs ("Access xStocks Integrate xStocks…", "More Wallets…")
+// match keywords by accident — they are dropped, never quoted as evidence.
+const MARKETING_NOISE = /^(access|integrate|more|explore|discover|learn|get started|buy|trade now|join|sign up|read more)\b/i;
+// Second net: testimonial attributions ("…," Kash Dhanda COO, Jupiter "…"),
+// social/email blobs and nav chrome that slip through sentence splitting.
+const JUNK_EXCERPT = /skip to content|linkedin\.com|discord\.(com|gg)|t\.me\/|x\.com\/|@[a-z0-9.-]+\.[a-z]{2,}|"\s*[A-Z][\w. ]{2,40}(COO|CEO|CTO|CFO|founder|co-founder)/i;
+// Nav-word salad: 5+ consecutive capitalized tokens ("Trading Kraken Kraken
+// Pro NinjaTrader…", "Docs Developer Guide API Reference…"). Real sentences
+// always intersperse lowercase words.
+const NAV_SALAD = /(\b[A-Z][a-zA-Z]*\b[\s|]+){5,}/;
+
 export function extractPassages(text: string, keywords: string[], maxPassages = 6): string[] {
   const lower = keywords.map((k) => k.toLowerCase());
   const sentences = text.split(/(?<=[.!?])\s+/);
@@ -184,6 +195,7 @@ export function extractPassages(text: string, keywords: string[], maxPassages = 
   for (const s of sentences) {
     const clean = s.trim();
     if (clean.length < 25 || clean.length > 600) continue;
+    if (MARKETING_NOISE.test(clean) || JUNK_EXCERPT.test(clean) || NAV_SALAD.test(clean)) continue;
     const l = clean.toLowerCase();
     if (lower.some((k) => l.includes(k))) {
       if (!hits.includes(clean)) hits.push(clean);
