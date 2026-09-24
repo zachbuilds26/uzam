@@ -335,13 +335,13 @@ export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
     {
       category: "concentration",
       severity: top10 === null ? "unknown" : top10 > 80 ? "high" : top10 > 50 ? "moderate" : "low",
-      reason: top10 === null ? "No holder distribution data available." : `Top 10 holders control ${top10}% of supply.`,
+      reason: top10 === null ? "No holder distribution data available." : `Top 10 holders control ${Number(top10.toFixed(2))}% of supply.`,
       evidence: top10 === null ? [] : ["okx:advanced-info:top10HoldPercent"],
     },
     {
       category: "liquidity",
       severity: liq === null ? "unknown" : liq < 50000 ? "high" : liq < 500000 ? "moderate" : "low",
-      reason: liq === null ? "No liquidity figure available." : `Observed pool liquidity ${liq} (OKX). Thin books can mean large price impact.`,
+      reason: liq === null ? "No liquidity figure available." : `Observed pool liquidity $${fmtNum(liq) ?? liq} (OKX). Thin books can mean large price impact.`,
       evidence: liq === null ? [] : ["okx:price-info:liquidity"],
     },
     {
@@ -383,7 +383,7 @@ export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
     {
       category: "information",
       severity: missing.length > 2 ? "moderate" : "low",
-      reason: missing.length === 0 ? "Full MVP source coverage." : `Gaps in this report: ${missing.join("; ")}.`,
+      reason: missing.length === 0 ? "All expected sources returned data." : `Gaps in this report: ${missing.join("; ")}.`,
       evidence: [],
     },
   ];
@@ -477,13 +477,29 @@ export function hasNum(v: unknown): boolean {
 
 export function pct(v: unknown): string {
   const n = toNum(v);
-  return n === null ? "n/a" : `${n}%`;
+  return n === null ? "n/a" : `${Number(n.toFixed(2))}%`;
 }
 
 // Money for display: 2 decimals. Raw strings stay in *_raw fields.
 export function fmtMoney(v: unknown): string | null {
   const n = toNum(v);
   return n === null ? null : n.toFixed(2);
+}
+
+// Big numbers for humans: thousands separators, fixed decimals.
+// Data stays raw in *_raw fields; this is display-only, always en-US
+// (digits are data, never translated).
+export function fmtNum(v: unknown, digits = 2): string | null {
+  const n = toNum(v);
+  if (n === null) return null;
+  return n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+// Excerpts cut at a word boundary — never mid-word ("...to lear").
+export function cutWords(s: string, max = 200): string {
+  if (s.length <= max) return s;
+  const cut = s.lastIndexOf(" ", max);
+  return (cut > max * 0.5 ? s.slice(0, cut) : s.slice(0, max)).trimEnd() + "…";
 }
 
 // ---- Shared OKX coverage counter: ONE definition, used by receipt,
@@ -552,9 +568,11 @@ export function summarizeTrades(trades: AnyObj[]): { sampled: number; buys: numb
 
 export function summarizePools(pools: AnyObj[]): { pools: { label: string; liquidity_usd: string | null }[]; total_liquidity_usd: string | null } | null {
   if (pools.length === 0) return null;
-  const rows = pools.slice(0, 5).map((p) => {
+  const rows = pools.slice(0, 5).map((p, i) => {
     const liq = toNum(p.liquidityUsd ?? p.liquidity ?? p.tvl ?? p.tvlUsd);
-    const label = `${String(p.protocol ?? p.dex ?? p.exchange ?? "pool")} ${p.fee ?? p.feeRate ?? ""}`.trim();
+    const who = p.protocol ?? p.dex ?? p.exchange ?? p.dexName ?? p.protocolName ?? p.name ?? null;
+    const addr = p.poolAddress ?? p.address ?? p.pairAddress ?? null;
+    const label = `${who ? `${who} ` : ""}Pool ${i + 1}${typeof addr === "string" && addr.length > 10 ? ` (${addr.slice(0, 6)}…${addr.slice(-4)})` : ""} ${p.fee ?? p.feeRate ?? ""}`.trim();
     return { label, liquidity_usd: liq !== null ? liq.toFixed(2) : null, _n: liq ?? 0 };
   });
   const total = rows.reduce((s, r) => s + r._n, 0);
@@ -719,12 +737,12 @@ export function summarizeResearch(r: AnyObj): string {
     ? "premium n/a (no underlying reference)"
     : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : "open"} reference`;
   lines.push(`> Token **${ta.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
-  lines.push(`> ${L("lbl_holders")} **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · ${L("lbl_liquidity")} **${ta.liquidity ?? "n/a"}**`);
+  lines.push(`> ${L("lbl_holders")} **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · ${L("lbl_liquidity")} **${fmtNum(ta.liquidity) ?? "n/a"}**`);
   lines.push(`> ${L("lbl_backing")}: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
   lines.push(`> ${L("lbl_overall")}: **${r.confidence.overall}** — ${confidenceReceipt(r)}`);
   lines.push(`> ${L("scale")}`);
   const premFormula = prem !== null && prem !== undefined && r.economics?.underlying_price
-    ? `Premium = (token − underlying) / underlying, token ${ta.price_raw ?? ta.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
+    ? `Premium = (token − underlying) / underlying, token ${fmtMoney(ta.price_raw) ?? ta.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
     : `No premium computed (${!r.economics?.underlying_price ? "underlying spot unavailable" : "no token price"}).`;
   lines.push(`### ${L("sec_premium")}`);
   lines.push(premFormula);
@@ -745,7 +763,8 @@ export function summarizeResearch(r: AnyObj): string {
       lines.push(`- Pools (${pb.pools.length}): ${pb.pools.map((p: AnyObj) => `${p.label} ($${p.liquidity_usd ?? "?"})`).join(" · ")}${pb.total_liquidity_usd ? ` — total $${pb.total_liquidity_usd}` : ""}.`);
     }
     if (ta.turnover_24h != null || ta.liquidity_to_mcap != null || ta.avg_trade_size != null) {
-      lines.push(`- Turnover 24h: **${ta.turnover_24h ?? "n/a"}x** · Liquidity/mcap: **${ta.liquidity_to_mcap ?? "n/a"}** · Avg trade: **${ta.avg_trade_size ? `$${ta.avg_trade_size}` : "n/a"}** · Txs 24h: **${ta.txs24H ?? "n/a"}** · Volume 24h: **$${ta.volume24H_raw ?? "n/a"}** · Mcap: **$${ta.marketCap_raw ?? "n/a"}**.`);
+      const turn = toNum(ta.turnover_24h);
+      lines.push(`- Turnover 24h: **${turn !== null ? `${turn.toFixed(2)}x` : "n/a"}** · Liquidity/mcap: **${ta.liquidity_to_mcap ?? "n/a"}** · Avg trade: **${ta.avg_trade_size ? `$${fmtNum(ta.avg_trade_size)}` : "n/a"}** · Txs 24h: **${ta.txs24H ?? "n/a"}** · Volume 24h: **$${fmtNum(ta.volume24H_raw) ?? "n/a"}** · Mcap: **$${fmtNum(ta.marketCap_raw) ?? "n/a"}**.`);
     }
   }
   lines.push(`### ${L("sec_backing")}`);
@@ -799,7 +818,7 @@ export function summarizeResearch(r: AnyObj): string {
   lines.push(`### ${L("sec_evidence")} ${L("ev_original")}`);
   if (ev.length === 0) lines.push(`- None captured — see unknowns.`);
   for (const e of ev) {
-    const excerpt = String(e.excerpt ?? "").slice(0, 200);
+    const excerpt = cutWords(String(e.excerpt ?? ""), 200);
     lines.push(`- [${e.source_title ?? "source"}](${e.source_url ?? "#"}) [Tier-${e.tier ?? "?"} ${e.source_type ?? ""}] — "${excerpt}"`);
   }
   const recent = ((r.recent_developments as AnyObj[] | undefined) ?? []).slice(0, 3);
@@ -874,6 +893,7 @@ export function summarizeCompare(c: AnyObj): string {
     }
   }
   lines.push(`### ${L("sec_leaders")}`);
+  if ((c.leaders as AnyObj[]).length === 0) lines.push(`- ${L("leaders_none")}`);
   for (const l of (c.leaders as AnyObj[])) lines.push(`- **${l.category}: ${l.leader ?? "tie"}** — ${l.reason}`);
   const withRange = rows.filter((r) => r.range_30d && r.range_30d.low);
   if (withRange.length > 0) {
@@ -972,7 +992,10 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   const geoExcerpts: string[] = Array.isArray(backing.geo_excerpts) ? backing.geo_excerpts : [];
   if (geoExcerpts.length === 0) unknowns.push("No jurisdiction/eligibility list extracted from fetched pages — confirm geo eligibility in issuer terms.");
   const attestLinks: string[] = Array.isArray(backing.attestation_links) ? backing.attestation_links : [];
-  if (attestLinks.length === 0) unknowns.push("No reserve attestation or proof-of-reserves link found on fetched pages.");
+  const backingQs: string[] = Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions : [];
+  if (attestLinks.length === 0 && !backingQs.some((q) => /attest/i.test(String(q)))) {
+    unknowns.push("No reserve attestation or proof-of-reserves link found on fetched pages.");
+  }
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
     ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "market_data" as SourceType, tier: 2, confidence: "MEDIUM", retrieved_at: now() }] : []),
