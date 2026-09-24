@@ -5,8 +5,8 @@ using onchain data, official documents, issuer information and evidence-backed
 research. The product is the MCP server: an agent connects over Streamable HTTP
 and calls research tools. Uzam gathers and cites — the agent reasons.
 
-- **Live MCP:** `https://uzam.onrender.com/mcp`
-- **Health:** `https://uzam.onrender.com/health`
+- **Live MCP:** `https://uzam-m3pi.onrender.com/mcp`
+- **Health:** `https://uzam-m3pi.onrender.com/health`
 - **Hackathon:** OKX Dev Day 2026 — primary track OKX AI (Agents), secondary X Layer RWA
 - **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx
 
@@ -30,7 +30,7 @@ Uzam states what is UNKNOWN instead of guessing, and never calls an asset "safe"
 ## Try it
 
 ```bash
-curl -X POST https://uzam.onrender.com/mcp \
+curl -X POST https://uzam-m3pi.onrender.com/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'

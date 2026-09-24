@@ -506,6 +506,8 @@ if (process.env.NODE_ENV === "production" && rawHosts.length === 0) {
 const app = rawHosts.length > 0
   ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: rawHosts })
   : createMcpExpressApp();
+// Behind Render's proxy: trust X-Forwarded-Proto so generated URLs use https.
+app.set("trust proxy", true);
 const nodeHandler = toNodeHandler(handler);
 
 app.all("/mcp", (req: Request, res: Response) => {
