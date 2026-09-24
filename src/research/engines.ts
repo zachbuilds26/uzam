@@ -714,11 +714,12 @@ export function summarizeResearch(r: AnyObj): string {
   const prem = r.economics?.premium_discount_bps;
   const premTxt = prem === null || prem === undefined
     ? "premium n/a (no underlying reference)"
-    : `${prem >= 0 ? "+" : ""}${prem} bps vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : "open"} reference`;
+    : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : "open"} reference`;
   lines.push(`> Token **${t.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
   lines.push(`> Holders **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · Liquidity **${t.liquidity ?? "n/a"}**`);
   lines.push(`> Backing: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
   lines.push(`> Overall confidence: **${r.confidence.overall}** — ${confidenceReceipt(r)}`);
+  lines.push(`> Scale: HIGH = multiple sources agree · MEDIUM = partly supported · LOW = thin or failed sources · UNKNOWN = no evidence`);
   const premFormula = prem !== null && prem !== undefined && r.economics?.underlying_price
     ? `Premium = (token − underlying) / underlying, token ${t.price_raw ?? t.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
     : `No premium computed (${!r.economics?.underlying_price ? "underlying spot unavailable" : "no token price"}).`;
@@ -807,7 +808,8 @@ export function summarizeCompare(c: AnyObj): string {
     const withPrem = rows.filter((r) => hasNum(r.premium_discount_bps));
     if (withPrem.length > 1) {
       const sorted = [...withPrem].sort((a, b) => Number(a.premium_discount_bps) - Number(b.premium_discount_bps));
-      lines.push(`- Cheapest premium: ${sorted[0].symbol} (${sorted[0].premium_discount_bps} bps) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].premium_discount_bps} bps) — Δ ${Math.abs(Number(sorted[sorted.length - 1].premium_discount_bps) - Number(sorted[0].premium_discount_bps))} bps.`);
+      const d = Math.abs(Number(sorted[sorted.length - 1].premium_discount_bps) - Number(sorted[0].premium_discount_bps));
+      lines.push(`- Cheapest premium: ${sorted[0].symbol} (${sorted[0].premium_discount_bps} bps, ≈ ${(Number(sorted[0].premium_discount_bps) / 100).toFixed(2)}%) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].premium_discount_bps} bps) — Δ ${d} bps (≈ ${(d / 100).toFixed(2)}%).`);
     }
     const withLiq = rows.filter((r) => hasNum(r.liquidity));
     if (withLiq.length > 1) {
@@ -987,7 +989,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   const cov = okxCoverage(missingList);
   const pages = Array.isArray(backing.pages_read) ? backing.pages_read.length : 0;
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  report.receipt = `Paid ${opts?.price ?? "free via MCP"} · ${cov.ok}/${cov.total} OKX endpoints + ${pages} page(s) + tokenlist + spot + news in ${secs}s · data ${report.data_timestamp} · re-query: {"symbol":"${asset.symbol}"}`;
+  report.receipt = `${opts?.price ? `Paid ${opts.price}` : "Free via MCP"} · ${cov.ok}/${cov.total} OKX endpoints + ${pages} page(s) + tokenlist + spot + news in ${secs}s · data ${report.data_timestamp}`;
   report.summary = summarizeResearch(report);
   if (focus === "risks") {
     return {
@@ -1106,7 +1108,7 @@ export async function compareAssets(symbols: string[], opts?: { price?: string }
     data_timestamp: now(),
   };
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  out.receipt = `Paid ${opts?.price ?? "free via MCP"} · ${rows.length} full report(s) in ${secs}s · data ${out.data_timestamp} · re-query: {"symbols":[${rows.map((r) => `"${r.symbol}"`).join(",")}]}`;
+  out.receipt = `${opts?.price ? `Paid ${opts.price}` : "Free via MCP"} · ${rows.length} full report(s) in ${secs}s · data ${out.data_timestamp}`;
   out.summary = summarizeCompare(out);
   return out;
 }
