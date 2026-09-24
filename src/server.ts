@@ -8,7 +8,7 @@ import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
 import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
-import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE } from "./payments/x402.js";
+import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
 
 // Bounded inputs: symbols are short tickers, never free text.
 const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/) });
@@ -542,8 +542,8 @@ app.get("/", (_req: Request, res: Response) => {
     mcp_endpoint: "/mcp",
     health: "/health",
     api: {
-      identify: "POST /api/identify (free)",
-      preview: "GET /api/research/preview?symbol=AAPLx (free)",
+      identify: `POST /api/identify (${billing.paid ? `${PRICE_IDENTIFY}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
+      preview: `GET /api/research/preview?symbol=AAPLx (${billing.paid ? `${PRICE_PREVIEW}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
       research: `POST /api/research (${billing.paid ? `${PRICE_RESEARCH}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
       compare: `POST /api/compare (${billing.paid ? `${PRICE_COMPARE}/call via x402` : "currently free — set PAY_TO_ADDRESS to charge"})`,
       receipts: "GET /api/receipts (free)",

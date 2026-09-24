@@ -17,6 +17,8 @@ import { loadOkxConfig } from "../okx/adapter.js";
 import { researchAsset, compareAssets, findAsset, supportedSymbols } from "../research/engines.js";
 
 const NETWORK = "eip155:196";
+export const PRICE_IDENTIFY = "$0.15";
+export const PRICE_PREVIEW = "$0.15";
 export const PRICE_RESEARCH = "$0.25";
 export const PRICE_COMPARE = "$0.50";
 // Public receipts log: last 50 paid-route calls (IPs stripped on read,
@@ -60,6 +62,16 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
       await resourceServer.initialize();
       paywall = paymentMiddleware(
         {
+          "POST /api/identify": {
+            accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_IDENTIFY }],
+            description: "Uzam asset identifier on X Layer: issuer, underlying, chain info and official documents.",
+            mimeType: "application/json",
+          },
+          "GET /api/research/preview": {
+            accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_PREVIEW }],
+            description: "Uzam capped research preview on one X Layer tokenized stock (identity only, no fetches).",
+            mimeType: "application/json",
+          },
           "POST /api/research": {
             accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_RESEARCH }],
             description: "Uzam full RWA research report on one X Layer tokenized stock (identity, backing evidence, onchain, risks, unknowns).",
@@ -73,7 +85,7 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
         },
         resourceServer
       ) as unknown as RequestHandler;
-      console.log(`[x402] paywall ON — research ${PRICE_RESEARCH}, compare ${PRICE_COMPARE} -> ${payTo} (identify free)`);
+      console.log(`[x402] paywall ON — identify ${PRICE_IDENTIFY}, preview ${PRICE_PREVIEW}, research ${PRICE_RESEARCH}, compare ${PRICE_COMPARE} -> ${payTo} (MCP free)`);
     } catch (e: unknown) {
       console.error("[x402] facilitator unreachable — paid routes running FREE:", e instanceof Error ? e.message : String(e));
     }
@@ -169,10 +181,11 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       network: NETWORK,
       asset: "USDT0",
       routes: [
-        { path: "POST /api/identify", price: "$0.00", description: "Free: resolve symbol to issuer, underlying, chain, docs." },
+        { path: "POST /mcp", price: "$0.00", description: "Free: 5 agent tools (identify, onchain, backing, research, compare)." },
+        { path: "POST /api/identify", price: PRICE_IDENTIFY, description: "Resolve symbol to issuer, underlying, chain, docs." },
         { path: "POST /api/research", price: PRICE_RESEARCH, description: "Full RWA report: identity, backing evidence, onchain, risks, unknowns." },
         { path: "POST /api/compare", price: PRICE_COMPARE, description: "Side-by-side comparison of up to 4 assets with per-category leaders." },
-        { path: "GET /api/research/preview?symbol=AAPLx", price: "$0.00", description: "Free capped preview: identity only, no fetches." },
+        { path: "GET /api/research/preview?symbol=AAPLx", price: PRICE_PREVIEW, description: "Capped preview: identity only, no fetches." },
       ],
     });
   });
@@ -200,9 +213,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   app.get("/llms.txt", (_req: Request, res: Response) => {
     res.type("text/plain").send(
       `# Uzam — RWA intelligence for xStocks on X Layer (chain 196)\n` +
-      `Free: POST /api/identify {"symbol":"AAPLx"} → issuer, underlying, docs.\n` +
-      `Paid (x402, USDT0 on X Layer): POST /api/research (${PRICE_RESEARCH}) → full report with backing evidence, onchain, 9 risks, unknowns, receipt. POST /api/compare (${PRICE_COMPARE}) → up to 4 assets, per-category leaders.\n` +
-      `Free preview: GET /api/research/preview?symbol=AAPLx (identity only).\n` +
+      `Paid (x402, USDT0 on X Layer): POST /api/identify (${PRICE_IDENTIFY}) → issuer, underlying, docs. POST /api/research (${PRICE_RESEARCH}) → full report with backing evidence, onchain, 9 risks, unknowns, receipt. POST /api/compare (${PRICE_COMPARE}) → up to 4 assets, per-category leaders. GET /api/research/preview?symbol=AAPLx (${PRICE_PREVIEW}, identity only).\n` +
       `MCP (free): POST /mcp → tools identify_asset, analyze_onchain, analyze_backing, research_asset, compare_assets.\n` +
       `Supported: ${supportedSymbols().join(", ")}. Never guesses; unknowns stated, never "safe".\n`
     );
