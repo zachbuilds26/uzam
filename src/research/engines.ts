@@ -280,7 +280,8 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
 }
 
 // ---- Live quote for identify: one price, fast, honestly capped ----
-// Resolves the contract via OKX search then takes the Basic-tier price.
+// Uses the issuer-published contract straight from the registry (one OKX
+// call, no search) — with live OKX-search fallback if it's ever missing.
 // Total budget 12s — a dead OKX returns "unavailable", never hangs identify.
 export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
   const stamp = now();
@@ -289,15 +290,20 @@ export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
   try {
     const work = (async (): Promise<AnyObj> => {
       const okx = new OKXOnchainAdapter(cfg);
-      const search = await okx.searchToken(XLAYER_CHAIN_INDEX, clean);
-      let contract: string | null = null;
+      const known = findAsset(clean)?.issuer_published_contract ?? null;
+      let contract: string | null = known && /^0x[0-9a-fA-F]{40}$/.test(known) ? known : null;
       let hit: AnyObj | null = null;
-      if (search.ok && Array.isArray(search.data)) {
-        const onX = (search.data as AnyObj[]).filter((x) => String(x.chainIndex) === XLAYER_CHAIN_INDEX);
-        hit = onX.find((x) => String(x.tokenSymbol ?? "").toUpperCase() === clean) ?? null;
-        if (hit?.tokenContractAddress) contract = String(hit.tokenContractAddress);
-      } else {
-        return { available: false, reason: `token_search: ${search.error ?? "unknown error"}`, data_timestamp: stamp };
+      let via: string = "issuer_published";
+      if (!contract) {
+        via = "okx_search";
+        const search = await okx.searchToken(XLAYER_CHAIN_INDEX, clean);
+        if (search.ok && Array.isArray(search.data)) {
+          const onX = (search.data as AnyObj[]).filter((x) => String(x.chainIndex) === XLAYER_CHAIN_INDEX);
+          hit = onX.find((x) => String(x.tokenSymbol ?? "").toUpperCase() === clean) ?? null;
+          if (hit?.tokenContractAddress) contract = String(hit.tokenContractAddress);
+        } else {
+          return { available: false, reason: `token_search: ${search.error ?? "unknown error"}`, data_timestamp: stamp };
+        }
       }
       if (!contract || !/^0x[0-9a-fA-F]{40}$/.test(contract)) {
         return { available: false, reason: "contract_on_xlayer", data_timestamp: stamp };
@@ -311,6 +317,7 @@ export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
         price: fmtMoney(p.price ?? hit?.price),
         price_raw: p.price ?? hit?.price ?? null,
         contracts: [contract],
+        contract_source: via,
         explorer: typeof hit?.explorerUrl === "string" && hit.explorerUrl.startsWith("https://") ? hit.explorerUrl : `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
         data_timestamp: stamp,
       };
