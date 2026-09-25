@@ -16,16 +16,10 @@ import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_P
 // Landing page (same-origin try-widget calls /mcp). Read once at boot;
 // if the file is missing (unexpected), fall back to a one-line page.
 let siteHtml = "<!doctype html><title>Uzam</title><h1>Uzam is running — see /info</h1>";
-let siteLogo: Buffer | null = null;
 try {
   siteHtml = readFileSync(join(process.cwd(), "src", "site", "index.html"), "utf8");
 } catch {
   console.warn("[site] src/site/index.html not found — serving fallback");
-}
-try {
-  siteLogo = readFileSync(join(process.cwd(), "src", "site", "uzam-logo.webp"));
-} catch {
-  console.warn("[site] src/site/uzam-logo.webp not found — logo route disabled");
 }
 
 // Bounded inputs: symbols are short tickers, never free text.
@@ -610,11 +604,6 @@ billing = { paid: false, reason: "paywall setup failed" };
 
 app.get("/", (_req: Request, res: Response) => {
   res.type("html").send(siteHtml);
-});
-
-app.get("/uzam-logo.webp", (_req: Request, res: Response) => {
-  if (!siteLogo) return res.sendStatus(404);
-  res.type("image/webp").send(siteLogo);
 });
 
 app.get("/info", (_req: Request, res: Response) => {
