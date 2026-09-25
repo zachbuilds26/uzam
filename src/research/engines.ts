@@ -258,6 +258,51 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   };
 }
 
+// ---- Live quote for identify: one price, fast, honestly capped ----
+// Resolves the contract via OKX search then takes the Basic-tier price.
+// Total budget 12s — a dead OKX returns "unavailable", never hangs identify.
+export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
+  const stamp = now();
+  const cfg = loadOkxConfig();
+  if (!cfg) return { available: false, reason: "okx_credentials", data_timestamp: stamp };
+  try {
+    const work = (async (): Promise<AnyObj> => {
+      const okx = new OKXOnchainAdapter(cfg);
+      const search = await okx.searchToken(XLAYER_CHAIN_INDEX, clean);
+      let contract: string | null = null;
+      let hit: AnyObj | null = null;
+      if (search.ok && Array.isArray(search.data)) {
+        const onX = (search.data as AnyObj[]).filter((x) => String(x.chainIndex) === XLAYER_CHAIN_INDEX);
+        hit = onX.find((x) => String(x.tokenSymbol ?? "").toUpperCase() === clean) ?? null;
+        if (hit?.tokenContractAddress) contract = String(hit.tokenContractAddress);
+      } else {
+        return { available: false, reason: `token_search: ${search.error ?? "unknown error"}`, data_timestamp: stamp };
+      }
+      if (!contract || !/^0x[0-9a-fA-F]{40}$/.test(contract)) {
+        return { available: false, reason: "contract_on_xlayer", data_timestamp: stamp };
+      }
+      const lc = contract.toLowerCase();
+      const priceRes = await okx.getPrice([{ chainIndex: XLAYER_CHAIN_INDEX, tokenContractAddress: lc }]);
+      const p = priceRes.ok && Array.isArray(priceRes.data) && priceRes.data[0] ? (priceRes.data[0] as AnyObj) : null;
+      if (!p) return { available: false, reason: `price: ${priceRes.error ?? "no data"}`, contracts: [contract], data_timestamp: stamp };
+      return {
+        available: true,
+        price: fmtMoney(p.price ?? hit?.price),
+        price_raw: p.price ?? hit?.price ?? null,
+        contracts: [contract],
+        explorer: typeof hit?.explorerUrl === "string" && hit.explorerUrl.startsWith("https://") ? hit.explorerUrl : `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
+        data_timestamp: stamp,
+      };
+    })();
+    const timeout = new Promise<AnyObj>((resolve) =>
+      setTimeout(() => resolve({ available: false, reason: "timeout_12s", data_timestamp: stamp }), 12000)
+    );
+    return await Promise.race([work, timeout]);
+  } catch (e) {
+    return { available: false, reason: `quote failed: ${e instanceof Error ? e.message : String(e)}`, data_timestamp: stamp };
+  }
+}
+
 // ---- Backing gather (same flow as analyze_backing: read official pages live) ----
 export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
   const urls = [asset.official_website, ...asset.official_documents].filter(

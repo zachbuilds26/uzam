@@ -9,7 +9,7 @@ import * as z from "zod/v4";
 import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
-import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
+import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios, fetchLiveQuote } from "./research/engines.js";
 import { normalizeLang, t } from "./research/i18n.js";
 import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
 
@@ -81,12 +81,13 @@ const handler = createMcpHandler(() => {
     "identify_asset",
     {
       description:
-        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents. Ask the user for lang (en, zh, es, fr) � required. Use this before any deeper research.",
+        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents, plus a live price quote when OKX is reachable. Ask the user for lang (en, zh, es, fr) — required. Use this before any deeper research.",
       inputSchema: SymbolInput,
     },
     async ({ symbol, lang }) => {
       const asset = findAsset(symbol);
       const L = (k: string): string => t(normalizeLang(lang), k);
+      const live = asset ? await fetchLiveQuote(asset.symbol) : null;
       if (!asset) {
         const supported = registry.assets.map((a) => a.symbol);
         return {
@@ -137,6 +138,7 @@ const handler = createMcpHandler(() => {
                 official_website: asset.official_website,
                 official_documents: asset.official_documents,
                 tokenlist_raw: registry.tokenlist_raw ?? null,
+                live: live ?? { available: false, reason: "not_attempted" },
                 related_assets: registry.assets.filter((a) => a.symbol !== asset.symbol).map((a) => a.symbol),
                 next_steps: [
                   { action: "research_asset", what: "full dossier: backing, premium, holders, risks, filings", price: PRICE_RESEARCH },

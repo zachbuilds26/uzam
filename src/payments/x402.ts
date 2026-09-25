@@ -14,7 +14,7 @@ import { OKXFacilitatorClient } from "@okxweb3/x402-core";
 import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { loadOkxConfig } from "../okx/adapter.js";
-import { researchAsset, compareAssets, findAsset, supportedSymbols } from "../research/engines.js";
+import { researchAsset, compareAssets, findAsset, supportedSymbols, fetchLiveQuote } from "../research/engines.js";
 
 const NETWORK = "eip155:196";
 export const PRICE_IDENTIFY = "$0.15";
@@ -148,6 +148,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       res.json({ ok: true, data: { found: false, symbol: symbol.trim().toUpperCase(), supported_symbols: supportedSymbols() } });
       return;
     }
+    const live = await fetchLiveQuote(asset.symbol);
     res.json({
       ok: true,
       data: {
@@ -156,6 +157,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
         underlying_asset: asset.underlying_asset, underlying: asset.underlying ?? null,
         chains: asset.chains, chainIds: asset.chainIds,
         official_website: asset.official_website, official_documents: asset.official_documents,
+        live,
         related_assets: supportedSymbols().filter((s) => s !== asset.symbol),
         next_steps: [
           { action: "research_asset", what: "full dossier: backing, premium, holders, risks, filings", price: PRICE_RESEARCH },
