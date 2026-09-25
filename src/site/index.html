@@ -377,7 +377,7 @@
       <div class="stack">
         <div>
           <p class="step-label">Free discovery — identify (MCP, no payment)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/mcp \
+          <div class="code"><pre class="codeblock">curl -X POST https://uzam-production-95f9.up.railway.app/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
@@ -386,7 +386,7 @@
         </div>
         <div>
           <p class="step-label">Paid depth — full report ($0.25 via x402)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/api/research \
+          <div class="code"><pre class="codeblock">curl -X POST https://uzam-production-95f9.up.railway.app/api/research \
   -H "Content-Type: application/json" \
   -d '{"symbol":"NVDAx","focus":"full","lang":"zh"}'
 # → 402 + PAYMENT-REQUIRED on first call; pay 0.25 USDT0 on X Layer, replay with the signature, get the dossier.</pre><button class="copy" type="button">Copy</button></div>
@@ -395,7 +395,7 @@
           <p class="step-label">Agent install snippet</p>
           <div class="code"><pre class="codeblock">{
   "mcpServers": {
-    "uzam": { "url": "https://uzam-m3pi.onrender.com/mcp" }
+    "uzam": { "url": "https://uzam-production-95f9.up.railway.app/mcp" }
   }
 }
 # Then ask: "Use Uzam to compare AAPLx vs TSLAx backing and biggest unanswered risks."</pre><button class="copy" type="button">Copy</button></div>
