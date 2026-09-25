@@ -571,7 +571,7 @@ if (process.env.NODE_ENV === "production" && rawHosts.length === 0) {
 const app = rawHosts.length > 0
   ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: rawHosts, jsonLimit: "1mb" })
   : createMcpExpressApp({ jsonLimit: "1mb" });
-// Behind Render's proxy: trust the first hop only for scheme/IP.
+// Behind the Railway proxy: trust the first hop only for scheme/IP.
 // Host validation reads the raw Host header (immune to X-Forwarded-Host).
 app.set("trust proxy", 1);
 const nodeHandler = toNodeHandler(handler);
@@ -652,7 +652,7 @@ srv.on("error", (e) => {
   console.error("listen failed:", e);
   process.exit(1);
 });
-// Graceful shutdown: Render sends SIGTERM on every redeploy; in-flight
+// Graceful shutdown: Railway sends SIGTERM on every redeploy; in-flight
 // ~20s reports get up to 10s to finish before force-exit.
 let shuttingDown = false;
 for (const sig of ["SIGTERM", "SIGINT"] as const) {
