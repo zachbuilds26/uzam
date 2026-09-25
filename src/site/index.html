@@ -191,7 +191,23 @@ h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
 .tryrow select { min-width: 0; flex: 1; padding: 12px 13px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg-2); color: var(--ink); font: 500 .84rem var(--font-ui); } .tryrow select:focus { border-color: var(--accent); }
 .tryrow .button { flex: 1; } .tryrow .button:disabled { opacity: .48; cursor: wait; transform: none; box-shadow: none; }
 #tryStatus { min-height: 22px; padding: 0 20px 8px; color: var(--muted); font: 600 .72rem var(--font-ui); } #tryStatus.err { color: #ffaaa0; }
-#tryOut { min-height: 190px; margin: 0 20px 20px; padding: 16px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: #0a1a18; color: var(--ink-2); font: 500 .78rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+.result-output { min-height: 190px; margin: 0 20px 20px; padding: 18px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: #0a1a18; color: var(--ink-2); font: 500 .86rem/1.6 var(--font-ui); }
+.result-output h3 { margin: 0 0 10px; color: var(--ink); font: 600 1.05rem/1.2 var(--font-display); }
+.result-output h3:not(:first-child) { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.result-output p { margin: 0 0 12px; }
+.result-output p:last-child { margin-bottom: 0; }
+.result-output ul, .result-output ol { margin: 0 0 14px 20px; padding: 0; }
+.result-output li { margin: 5px 0; padding-left: 3px; }
+.result-output strong { color: var(--ink); font-weight: 700; }
+.result-output em { color: var(--ink); }
+.result-output code { padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: rgba(157, 236, 206, .08); }
+.result-output a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.answer-row { display: grid; grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr); gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.answer-row:last-child { border-bottom: 0; }
+.answer-label { color: var(--muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.answer-value { min-width: 0; color: var(--ink-2); }
+.answer-muted { color: var(--muted); }
+.answer-error { color: #ffaaa0; }
 
 .architecture { align-items: center; }
 .architecture-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 28px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
@@ -249,7 +265,7 @@ h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
     <article class="strategy-card"><span class="strategy-icon">↗</span><div><span class="strategy-number">05</span><h3>Built for agents</h3><p>Use MCP, REST, or x402 with structured output made for agent workflows.</p></div><span class="strategy-arrow">↗</span></article>
   </div></div></section>
 
-  <section class="section live-section" id="try"><div class="container live-layout"><div><p class="eyebrow">Try real research · free via MCP</p><h2>Get a clearer answer.</h2><p class="lead">Choose an asset and language, then run an instant identity check or a full evidence-backed report.</p></div><div class="trybox"><div class="trybox-top"><strong>Live research console</strong><span>MCP endpoint</span></div><div class="tryrow"><select id="sym" aria-label="Token symbol"><option value="AAPLx">AAPLx — Apple</option><option value="TSLAx">TSLAx — Tesla</option><option value="NVDAx" selected>NVDAx — NVIDIA</option><option value="SPYx">SPYx — S&amp;P 500</option><option value="GOOGLx">GOOGLx — Alphabet</option><option value="MSFTx">MSFTx — Microsoft</option><option value="AMZNx">AMZNx — Amazon</option><option value="METAx">METAx — Meta</option><option value="NFLXx">NFLXx — Netflix</option><option value="AMDx">AMDx — AMD</option><option value="COINx">COINx — Coinbase</option><option value="HOODx">HOODx — Robinhood</option><option value="AVGOx">AVGOx — Broadcom</option><option value="JPMx">JPMx — JPMorgan</option><option value="Vx">Vx — Visa</option><option value="PLTRx">PLTRx — Palantir</option></select><select id="lang" aria-label="Response language"><option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option></select></div><div class="tryrow"><button class="button secondary" id="btnId" type="button">Identify — instant</button><button class="button" id="btnGo" type="button">Full report — ~20s</button></div><p id="tryStatus" role="status"></p><pre id="tryOut">Your answer appears here.</pre></div></div></section>
+  <section class="section live-section" id="try"><div class="container live-layout"><div><p class="eyebrow">Try real research · free via MCP</p><h2>Get a clearer answer.</h2><p class="lead">Choose an asset and language, then run an instant identity check or a full evidence-backed report.</p></div><div class="trybox"><div class="trybox-top"><strong>Live research console</strong><span>MCP endpoint</span></div><div class="tryrow"><select id="sym" aria-label="Token symbol"><option value="AAPLx">AAPLx — Apple</option><option value="TSLAx">TSLAx — Tesla</option><option value="NVDAx" selected>NVDAx — NVIDIA</option><option value="SPYx">SPYx — S&amp;P 500</option><option value="GOOGLx">GOOGLx — Alphabet</option><option value="MSFTx">MSFTx — Microsoft</option><option value="AMZNx">AMZNx — Amazon</option><option value="METAx">METAx — Meta</option><option value="NFLXx">NFLXx — Netflix</option><option value="AMDx">AMDx — AMD</option><option value="COINx">COINx — Coinbase</option><option value="HOODx">HOODx — Robinhood</option><option value="AVGOx">AVGOx — Broadcom</option><option value="JPMx">JPMx — JPMorgan</option><option value="Vx">Vx — Visa</option><option value="PLTRx">PLTRx — Palantir</option></select><select id="lang" aria-label="Response language"><option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option></select></div><div class="tryrow"><button class="button secondary" id="btnId" type="button">Identify — instant</button><button class="button" id="btnGo" type="button">Full report — ~20s</button></div><p id="tryStatus" role="status"></p><div id="tryOut" class="result-output" aria-live="polite"><p class="answer-muted">Your answer will appear here.</p></div></div></div></section>
 
   <section class="section" id="api"><div class="container architecture"><div><p class="eyebrow">Research that fits your stack</p><h2>Built for agents.</h2></div><div><p class="architecture-copy">Connect once, get structured research, and keep the boundary around what is known visible. <code>402 Payment Required</code> handles paid depth without a billing dashboard.</p><div class="architecture-cards"><article class="architecture-card"><span class="card-icon">⌁</span><span class="card-index">01 / FREE TO START</span><h3>MCP access</h3><p>Connect an agent to one URL and ask about any supported token.</p></article><article class="architecture-card"><span class="card-icon">$</span><span class="card-index">02 / PAY FOR DEPTH</span><h3>Paid research depth</h3><p>Pay for deeper research in USDT0 on X Layer, without signup or a billing dashboard.</p></article><article class="architecture-card"><span class="card-icon">✓</span><span class="card-index">03 / READY TO CITE</span><h3>Citable output</h3><p>Every report includes sources, timestamps, confidence, missing data, and clear limits.</p></article></div></div></div></section>
 
@@ -258,17 +274,7 @@ h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
   <section class="cta" id="start"><div class="container"><div class="cta-inner"><h2>Get a clearer answer.</h2><p>Pick an asset, review the evidence, and give your agent a report it can cite.</p><a class="button" href="#try">Open research console <span class="arrow">↗</span></a></div></div></section>
 </main>
 <script>
-/* Copy buttons are intentionally kept small and local; the live widget still calls the production MCP endpoint. */
 (function () {
-  var header = document.querySelector('.site-header');
-  var menu = document.querySelector('.menu-toggle');
-  if (header && menu) {
-    menu.addEventListener('click', function () {
-      var open = header.classList.toggle('menu-open');
-      menu.setAttribute('aria-expanded', String(open));
-      menu.textContent = open ? '×' : '☰';
-    });
-  }
   var sym = document.getElementById('sym');
   var lang = document.getElementById('lang');
   var out = document.getElementById('tryOut');
@@ -277,11 +283,86 @@ h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
   var btnGo = document.getElementById('btnGo');
   if (!sym || !out) return;
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (char) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+    });
+  }
+
+  function inlineMarkdown(value) {
+    var safe = escapeHtml(value);
+    safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    safe = safe.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>');
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    safe = safe.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return safe;
+  }
+
+  function labelize(value) {
+    return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function renderAnswer(value) {
+    var text = String(value || '').replace(/\r/g, '').trim();
+    if (!text) return '<p class="answer-muted">No answer was returned.</p>';
+    var lines = text.split('\n');
+    var html = [];
+    var paragraph = [];
+    var listTag = null;
+    function flushParagraph() {
+      if (paragraph.length) {
+        html.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
+        paragraph = [];
+      }
+    }
+    function closeList() {
+      if (listTag) { html.push('</' + listTag + '>'); listTag = null; }
+    }
+    lines.forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) { flushParagraph(); closeList(); return; }
+      var heading = line.match(/^#{1,6}\s+(.+)$/);
+      var bullet = line.match(/^[-*•]\s+(.+)$/);
+      var numbered = line.match(/^\d+[.)]\s+(.+)$/);
+      var pair = line.match(/^([^:]{2,48}):\s+(.+)$/);
+      if (heading) {
+        flushParagraph(); closeList(); html.push('<h3>' + inlineMarkdown(heading[1]) + '</h3>');
+      } else if (bullet || numbered) {
+        flushParagraph();
+        var tag = numbered ? 'ol' : 'ul';
+        if (listTag !== tag) { closeList(); html.push('<' + tag + '>'); listTag = tag; }
+        html.push('<li>' + inlineMarkdown((bullet || numbered)[1]) + '</li>');
+      } else if (pair && !/^https?:\/\//i.test(pair[2])) {
+        flushParagraph(); closeList();
+        html.push('<div class="answer-row"><span class="answer-label">' + inlineMarkdown(pair[1]) + '</span><span class="answer-value">' + inlineMarkdown(pair[2]) + '</span></div>');
+      } else {
+        closeList(); paragraph.push(line);
+      }
+    });
+    flushParagraph(); closeList();
+    return html.join('');
+  }
+
+  function renderResponse(data) {
+    if (data && typeof data.summary === 'string' && data.summary.trim()) return renderAnswer(data.summary);
+    if (typeof data === 'string') return renderAnswer(data);
+    if (data && typeof data === 'object') {
+      var lines = Object.keys(data).map(function (key) {
+        var value = data[key];
+        return labelize(key) + ': ' + (typeof value === 'object' ? JSON.stringify(value) : String(value));
+      });
+      return renderAnswer(lines.join('\n'));
+    }
+    return renderAnswer(data);
+  }
+
   function setBusy(busy, label) {
     btnId.disabled = busy;
     btnGo.disabled = busy;
     if (busy) status.textContent = label;
   }
+
   function mcpCall(tool, args) {
     return fetch('/mcp', {
       method: 'POST',
@@ -300,31 +381,44 @@ h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
       return JSON.parse(content.text || '{}');
     });
   }
-  function renderIdentify(d) {
-    if (!d.found) return 'Not in registry. Supported: ' + (d.supported_symbols || []).join(', ') + '\n' + (d.uncertainty || '');
+
+  function identifyText(data) {
+    if (!data.found) return 'Not in registry:\nSupported symbols: ' + (data.supported_symbols || []).join(', ') + '\n' + (data.uncertainty || '');
     var lines = [];
-    lines.push(d.symbol + ' — ' + d.name);
-    lines.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
-    lines.push('Underlying: ' + (d.underlying_asset || ''));
-    if (d.underlying && d.underlying.ticker) lines.push('  Ticker ' + d.underlying.ticker + ' · ' + (d.underlying.exchange || ''));
-    lines.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')');
-    if (d.live && d.live.available) lines.push('Live: $' + d.live.price);
-    else if (d.live) lines.push('Live price unavailable — ' + (d.live.reason || 'unknown'));
-    lines.push('Official docs:');
-    (d.official_documents || []).forEach(function (url) { lines.push('  - ' + url); });
+    lines.push(data.symbol + ' — ' + data.name);
+    lines.push('Issuer: ' + data.issuer + (data.issuer_legal ? ' (' + data.issuer_legal + ')' : ''));
+    lines.push('Underlying: ' + (data.underlying_asset || ''));
+    if (data.underlying && data.underlying.ticker) lines.push('Ticker: ' + data.underlying.ticker + ' · ' + (data.underlying.exchange || ''));
+    lines.push('Chain: ' + (data.chains || []).join(', ') + ' (' + (data.chainIds || []).join(', ') + ')');
+    if (data.live && data.live.available) lines.push('Live price: $' + data.live.price);
+    else if (data.live) lines.push('Live price: ' + (data.live.reason || 'unavailable'));
+    lines.push('Official documents:');
+    (data.official_documents || []).forEach(function (url) { lines.push('- ' + url); });
     return lines.join('\n');
   }
+
   btnId.addEventListener('click', function () {
-    setBusy(true, 'Asking Uzam…'); out.textContent = '…';
+    setBusy(true, 'Checking the asset…');
+    out.innerHTML = '<p class="answer-muted">Working on it…</p>';
     mcpCall('identify_asset', { symbol: sym.value, lang: lang.value }).then(function (data) {
-      out.textContent = renderIdentify(data); status.textContent = 'Free via MCP · live response.';
-    }).catch(function (error) { out.textContent = 'Failed: ' + error.message; status.textContent = 'Error — retry, or check /health.'; status.className = 'err'; }).then(function () { setBusy(false); });
+      out.innerHTML = renderAnswer(identifyText(data));
+      status.textContent = 'Free via MCP · live response.';
+    }).catch(function (error) {
+      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the answer: ' + error.message) + '</p>';
+      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
+    }).then(function () { setBusy(false); });
   });
+
   btnGo.addEventListener('click', function () {
-    setBusy(true, 'Full research runs ~20s…'); out.textContent = 'Gathering evidence…';
+    setBusy(true, 'Research takes about 20 seconds…');
+    out.innerHTML = '<p class="answer-muted">Gathering evidence from documents and onchain data…</p>';
     mcpCall('research_asset', { symbol: sym.value, focus: 'full', lang: lang.value }).then(function (data) {
-      out.textContent = data.summary || JSON.stringify(data, null, 2).slice(0, 6000); status.textContent = 'Free via MCP · full dossier above.';
-    }).catch(function (error) { out.textContent = 'Failed: ' + error.message; status.textContent = 'Error — retry, or check /health.'; status.className = 'err'; }).then(function () { setBusy(false); });
+      out.innerHTML = renderResponse(data);
+      status.textContent = 'Free via MCP · full report above.';
+    }).catch(function (error) {
+      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the report: ' + error.message) + '</p>';
+      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
+    }).then(function () { setBusy(false); });
   });
 }());
 </script>
