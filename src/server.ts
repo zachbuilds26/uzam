@@ -47,7 +47,7 @@ type RegistryAsset = {
 };
 
 const registry = z.object({
-  chain: z.object({ name: z.string(), chainId: z.number(), chainIndex: z.number() }),
+  chain: z.object({ name: z.string(), chainId: z.number(), chainIndex: z.number(), rpc: z.string().optional(), explorer: z.string().optional() }),
   tokenlist: z.string(),
   tokenlist_raw: z.string().optional(),
   issuer_docs: z.string().optional(),
@@ -59,7 +59,7 @@ const registry = z.object({
     contract_addresses: z.array(z.string()),
     official_website: z.string(), official_documents: z.array(z.string()),
   })),
-}).parse(registryJson) as { chain: { name: string; chainId: number; chainIndex: number }; tokenlist: string; assets: RegistryAsset[] };
+}).parse(registryJson) as { chain: { name: string; chainId: number; chainIndex: number; rpc?: string; explorer?: string }; tokenlist: string; tokenlist_raw?: string; issuer_docs?: string; assets: RegistryAsset[] };
 
 function findAsset(symbol: unknown): RegistryAsset | undefined {
   if (typeof symbol !== "string") return undefined;
@@ -125,6 +125,10 @@ const handler = createMcpHandler(() => {
                 underlying: asset.underlying ?? null,
                 chains: asset.chains,
                 chainIds: asset.chainIds,
+                chain_info: {
+                  rpc: registry.chain.rpc ?? null,
+                  explorer: registry.chain.explorer ?? null,
+                },
                 contract_addresses: asset.contract_addresses,
                 contracts_note:
                   asset.contract_addresses.length === 0
@@ -132,6 +136,12 @@ const handler = createMcpHandler(() => {
                     : undefined,
                 official_website: asset.official_website,
                 official_documents: asset.official_documents,
+                tokenlist_raw: registry.tokenlist_raw ?? null,
+                related_assets: registry.assets.filter((a) => a.symbol !== asset.symbol).map((a) => a.symbol),
+                next_steps: [
+                  { action: "research_asset", what: "full dossier: backing, premium, holders, risks, filings", price: PRICE_RESEARCH },
+                  { action: "compare_assets", what: "side-by-side with up to 3 more assets", price: PRICE_COMPARE },
+                ],
               },
               null,
               2
