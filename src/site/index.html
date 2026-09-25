@@ -509,6 +509,14 @@ document.addEventListener('click', function (ev) {
     return sym.value;
   }
 
+  // Machine reason codes → human words. The JSON keeps the codes; humans read this.
+  function liveHuman(reason) {
+    var r = String(reason || '');
+    if (/contract_on_xlayer|token_search|timeout_12s|network error|fetch failed/i.test(r)) return 'market unreachable right now — retry shortly';
+    if (/okx_credentials/i.test(r)) return 'market data not configured';
+    return r || 'unknown';
+  }
+
   function renderIdentify(d) {
     if (!d.found) return 'Not in registry. Supported: ' + (d.supported_symbols || []).join(', ') + '\n' + (d.uncertainty || '');
     var L = [];
@@ -516,11 +524,10 @@ document.addEventListener('click', function (ev) {
     L.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
     L.push('Underlying: ' + (d.underlying_asset || ''));
     if (d.underlying && d.underlying.ticker) L.push('  Ticker ' + d.underlying.ticker + ' · ' + (d.underlying.exchange || '') + (d.underlying.sec_filings ? ' · Filings: ' + d.underlying.sec_filings : ''));
-    L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')');
+    L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')' + (d.chain_info && d.chain_info.explorer ? ' — ' + d.chain_info.explorer : ''));
     if (d.live && d.live.available) L.push('Live: $' + d.live.price + ' (' + (d.live.data_timestamp || '').slice(0, 16).replace('T', ' ') + ' UTC)');
-    else if (d.live) L.push('Live price unavailable (' + (d.live.reason || 'unknown') + ')');
-    if (d.chain_info && d.chain_info.explorer) L.push('Explorer: ' + d.chain_info.explorer);
-    L.push('Docs: ' + d.official_website);
+    else if (d.live) L.push('Live price unavailable — ' + liveHuman(d.live.reason));
+    L.push('Official docs:');
     (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
     return L.join('\n');
   }
