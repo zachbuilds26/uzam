@@ -1,5 +1,7 @@
 # Uzam — RWA Intelligence MCP for AI Agents
 
+- **Deployment:** Railway, connected to the `master` branch with auto deploy enabled.
+
 Uzam gives AI agents the ability to investigate tokenized assets on **X Layer**
 using onchain data, official documents, issuer information and evidence-backed
 research. The product is the MCP server: an agent connects over Streamable HTTP
