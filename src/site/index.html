@@ -293,7 +293,16 @@
       </div>
       <div class="trybox frame slab">
         <div class="tryrow">
-          <input id="sym" type="text" maxlength="20" placeholder="AAPLx" value="NVDAx" aria-label="Token symbol" />
+          <select id="sym" aria-label="Token symbol">
+            <option value="AAPLx">AAPLx — Apple</option>
+            <option value="TSLAx">TSLAx — Tesla</option>
+            <option value="NVDAx" selected>NVDAx — NVIDIA</option>
+            <option value="SPYx">SPYx — S&amp;P 500</option>
+            <option value="GOOGLx">GOOGLx — Alphabet</option>
+            <option value="MSFTx">MSFTx — Microsoft</option>
+            <option value="AMZNx">AMZNx — Amazon</option>
+            <option value="METAx">METAx — Meta</option>
+          </select>
           <select id="lang" aria-label="Response language">
             <option value="en">English</option>
             <option value="zh">中文</option>
@@ -581,9 +590,7 @@ document.addEventListener('click', function (ev) {
   }
 
   function cleanSymbol() {
-    var s = (sym.value || '').trim().toUpperCase();
-    if (!/^[A-Z0-9.\-]{1,20}$/.test(s)) throw new Error('Enter a ticker like AAPLx or NVDAx.');
-    return s;
+    return sym.value;
   }
 
   function renderIdentify(d) {
