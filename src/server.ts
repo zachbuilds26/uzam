@@ -1,5 +1,7 @@
 import "dotenv/config";
 import type { Request, Response } from "express";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createMcpExpressApp } from "@modelcontextprotocol/express";
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
@@ -10,6 +12,15 @@ import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provide
 import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios } from "./research/engines.js";
 import { normalizeLang, t } from "./research/i18n.js";
 import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
+
+// Landing page (same-origin try-widget calls /mcp). Read once at boot;
+// if the file is missing (unexpected), fall back to a one-line page.
+let siteHtml = "<!doctype html><title>Uzam</title><h1>Uzam is running — see /info</h1>";
+try {
+  siteHtml = readFileSync(join(process.cwd(), "src", "site", "index.html"), "utf8");
+} catch {
+  console.warn("[site] src/site/index.html not found — serving fallback");
+}
 
 // Bounded inputs: symbols are short tickers, never free text.
 // lang is REQUIRED on MCP tools so the calling agent must ask the human
@@ -559,6 +570,10 @@ billing = { paid: false, reason: "paywall setup failed" };
 }
 
 app.get("/", (_req: Request, res: Response) => {
+  res.type("html").send(siteHtml);
+});
+
+app.get("/info", (_req: Request, res: Response) => {
   res.json({
     service: "uzam",
     description:

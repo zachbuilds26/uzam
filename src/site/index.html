@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Uzam — RWA intelligence for xStocks your agent can cite</title>
+<meta name="description" content="Uzam researches xStocks tokenized equities on X Layer: quoted backing evidence, onchain holders and liquidity, 9-category risks, SEC filings — and states what it cannot prove instead of guessing. MCP + x402 API. Listed on OKX.AI." />
+<meta property="og:title" content="Uzam — RWA intelligence for xStocks" />
+<meta property="og:description" content="One call: backing evidence, premium, holders, risks, unknowns. Never guesses. Live on X Layer (196)." />
+<meta name="theme-color" content="#000000" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z' fill='none' stroke='%2352FF00' stroke-width='10'/%3E%3Ccircle cx='50' cy='50' r='12' fill='%2352FF00'/%3E%3C/svg%3E" />
+<style>
+  /* Somnus grammar, Uzam palette: black + signal greens.
+     #52FF00 primary, #66FF00 hover, #38BD00 deep. Black ink on green.
+     Thick white frames, hard offset slabs, square corners, grid backdrop. */
+  :root {
+    --background: #000000;
+    --background-deep: #000000;
+    --surface: #111111;
+    --raised: #1a1a1a;
+    --hover: #222222;
+    --line: #ffffff;
+    --ink: #ffffff;
+    --muted: #9c9c9c;
+    --faint: #6b6b6b;
+    --accent: #52FF00;
+    --accent-hover: #66FF00;
+    --accent-deep: #38BD00;
+    --accent-ink: #000000;
+  }
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--background); scroll-behavior: smooth; }
+  body {
+    min-height: 100vh; margin: 0; background: var(--background); color: var(--ink);
+    font-family: "Space Grotesk", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3 { font-family: "Syne", Arial, sans-serif; margin: 0; letter-spacing: -0.045em; }
+  p { margin: 0; }
+  a { color: inherit; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+  section[id] { scroll-margin-top: 1rem; }
+
+  .frame { border: 2px solid var(--line); }
+  .slab { box-shadow: 4px 4px 0 0 var(--ink); }
+
+  .grid-fade {
+    background-image:
+      linear-gradient(to right, rgba(82,255,0,0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(82,255,0,0.06) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+
+  /* ── splash ── */
+  #splash {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--background);
+    transition: opacity 300ms ease;
+  }
+  #splash.done { opacity: 0; pointer-events: none; }
+  #splash .row { display: flex; align-items: center; gap: 12px; overflow: hidden; }
+  #splash .word {
+    font-family: "Syne", Arial, sans-serif; font-size: 22px; font-weight: 600;
+    letter-spacing: -0.03em; white-space: nowrap; overflow: hidden;
+    max-width: 0; opacity: 0; transition: max-width 500ms ease, opacity 300ms ease;
+  }
+  #splash.typing .word { max-width: 250px; opacity: 1; }
+  #splash .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── header ── */
+  header.bar {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(0,0,0,0.92); backdrop-filter: blur(8px);
+    border-bottom: 2px solid var(--line);
+  }
+  .bar-in { max-width: 1120px; margin: 0 auto; padding: 0 20px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .wordmark { display: inline-flex; align-items: center; gap: 8px; font-family: "Syne", Arial, sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.03em; text-decoration: none; }
+  .wordmark .hex { width: 22px; height: 22px; flex: none; }
+  nav.links { display: flex; align-items: center; gap: 22px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  nav.links a { text-decoration: none; padding: 8px 0; }
+  nav.links a:hover { color: var(--accent); }
+  nav.links a:focus { outline: none; }
+  nav.links a:focus-visible { outline: none; color: var(--accent); }
+  .bar-cta { display: flex; align-items: center; gap: 10px; }
+  .bar-link { font-size: 12px; font-weight: 600; color: var(--ink); text-decoration: none; padding: 8px 0; }
+  .bar-link:hover { color: var(--accent); }
+  @media (max-width: 720px) { nav.links .hide-sm { display: none; } }
+
+  /* ── buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 20px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
+    border: 2px solid var(--line); background: transparent; color: var(--ink);
+    box-shadow: 4px 4px 0 0 var(--ink);
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 160ms ease;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--ink); background: var(--surface); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
+  .btn svg { width: 16px; height: 16px; flex: none; }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+    box-shadow: 4px 4px 0 0 var(--ink);
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: 6px 6px 0 0 var(--ink); }
+  .btn-primary:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
+  .btn-sm { padding: 10px 14px; font-size: 12px; }
+  .btn[disabled] { opacity: 0.55; cursor: wait; transform: none; }
+
+  /* ── hero ── */
+  .hero { position: relative; isolation: isolate; overflow: hidden; }
+  .hero-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.6; }
+  .hero-fade { position: absolute; inset-inline: 0; bottom: 0; height: 128px; background: linear-gradient(to top, var(--background), transparent); pointer-events: none; }
+  .hero-in {
+    position: relative; z-index: 1; max-width: 896px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 20px; padding: 104px 20px 56px;
+  }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+  }
+  .live-badge .dot { width: 6px; height: 6px; background: var(--accent); animation: blink 1.6s steps(1) infinite; }
+  .hero h1 { font-size: clamp(30px, 4.6vw, 52px); line-height: 0.95; max-width: 16ch; }
+  .hero h1 .accent { color: var(--accent); }
+  .hero .sub { max-width: 62ch; font-size: 16px; line-height: 1.7; color: var(--muted); }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; }
+  .hero-note { max-width: 60ch; font-size: 12px; line-height: 1.6; color: var(--muted); }
+  .hero-note a { color: var(--accent); text-underline-offset: 2px; }
+  .hero-note a:hover { color: var(--ink); }
+
+  /* ── sections ── */
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 80px 20px; }
+  .kicker { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
+  .band-head { max-width: 640px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 48px; }
+  .band-head h2 { font-size: clamp(23px, 3.4vw, 38px); line-height: 1.02; }
+  .band-head p { font-size: 14px; line-height: 1.7; color: var(--muted); }
+  .band-head.center { text-align: center; align-items: center; margin-inline: auto; }
+  .band-head.center p { max-width: 62ch; }
+
+  /* ── cards: framed, slabbed, square ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .card { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .card h3 { font-size: 17px; }
+  .card .price { font-family: "Syne", Arial, sans-serif; font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: -0.03em; }
+  .card .price small { font-size: 13px; color: var(--muted); font-family: "Space Grotesk", Arial, sans-serif; font-weight: 500; letter-spacing: 0; }
+  .card p { font-size: 13px; line-height: 1.65; color: var(--muted); }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+  .card .tag { align-self: flex-start; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 8px; }
+
+  /* ── try widget ── */
+  .trybox { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 900px; margin: 0 auto; }
+  .tryrow { display: flex; flex-wrap: wrap; gap: 12px; }
+  .tryrow input, .tryrow select {
+    font: inherit; font-size: 14px; color: var(--ink); background: var(--background);
+    border: 2px solid var(--line); padding: 12px 14px; min-width: 0;
+  }
+  .tryrow input { flex: 2 1 160px; text-transform: uppercase; }
+  .tryrow select { flex: 1 1 130px; }
+  .tryrow input::placeholder { color: var(--faint); }
+  #tryStatus { font-size: 12px; color: var(--muted); min-height: 18px; }
+  #tryStatus.err { color: #ff6b6b; }
+  #tryOut {
+    margin: 0; padding: 16px; overflow-x: auto; max-height: 420px; overflow-y: auto;
+    background: var(--background); border: 1px solid rgba(255,255,255,0.18);
+    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+
+  /* ── setup tabs ── */
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: center; margin: 40px 0 20px; }
+  .tab {
+    padding: 10px 2px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
+    box-shadow: none;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:focus { outline: none; }
+  .tab:focus-visible { outline: none; color: var(--ink); border-bottom-color: var(--accent); }
+  .panel { padding: 8px 0 24px; max-width: 900px; margin: 0 auto; }
+  .panel[hidden] { display: none; }
+  .panel h3 { font-size: 17px; margin-bottom: 8px; }
+  .panel .note { font-size: 14px; line-height: 1.65; color: var(--muted); margin-bottom: 20px; max-width: 68ch; }
+  .step-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; }
+  .step-label:first-of-type { margin-top: 0; }
+  .bridge { max-width: 900px; margin: 24px auto 0; font-size: 14px; line-height: 1.7; color: var(--muted); text-align: center; }
+
+  /* ── code blocks ── */
+  .code { position: relative; }
+  pre.codeblock {
+    margin: 0; padding: 16px 84px 16px 16px; overflow-x: auto;
+    background: var(--surface); border: 1px solid rgba(255,255,255,0.18);
+    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .copy {
+    position: absolute; top: 12px; right: 12px; padding: 7px 12px;
+    font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+    background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.25);
+    transition: transform 120ms ease, color 160ms ease, background-color 160ms ease;
+  }
+  .copy:hover { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+  .stack { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto; }
+
+  footer { border-top: 2px solid var(--line); }
+  .foot {
+    max-width: 1120px; margin: 0 auto; padding: 24px 20px;
+    display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--muted);
+  }
+  .foot a { color: var(--accent); text-underline-offset: 2px; }
+  .foot a:hover { color: var(--ink); }
+  .disclaimer { max-width: 1120px; margin: 0 auto; padding: 0 20px 24px; font-size: 11px; line-height: 1.6; color: var(--faint); }
+
+  @media (max-width: 640px) {
+    .hero-in { padding: 76px 20px 44px; }
+    .wrap { padding: 56px 20px; }
+    .hero-cta .btn { width: 100%; }
+    input, select, textarea { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+    #splash { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="splash" aria-hidden="true">
+  <div class="row">
+    <svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>
+    <span class="word">UZAM<span class="caret"></span></span>
+  </div>
+</div>
+
+<header class="bar">
+  <div class="bar-in">
+    <a class="wordmark" href="#top" aria-label="Uzam home">
+      <svg class="hex" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>UZAM
+    </a>
+    <nav class="links" aria-label="Main navigation">
+      <a href="#try">Try live</a>
+      <a href="#pricing" class="hide-sm">Pricing</a>
+      <a href="#setup" class="hide-sm">Setup</a>
+      <a href="https://www.okx.ai/agents/13653">OKX.AI</a>
+    </nav>
+    <div class="bar-cta">
+      <a class="bar-link" href="/health">Live health</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-grid grid-fade" aria-hidden="true"></div>
+    <div class="hero-fade" aria-hidden="true"></div>
+    <div class="hero-in">
+      <p class="live-badge"><span class="dot" aria-hidden="true"></span>Live on X Layer · Chain 196 · ASP #13653 on OKX.AI</p>
+      <h1>Tokenized-stock research your agent can <span class="accent">cite.</span></h1>
+      <p class="sub">
+        Uzam digs through issuer docs, SEC filings, and X Layer onchain data so your agent
+        doesn't have to. Quoted backing evidence, price-vs-reference premium, holders and
+        liquidity, 9-category risks — and it states what it cannot prove instead of guessing.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#try">
+          Try it live — free
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+        </a>
+        <a class="btn" href="https://www.okx.ai/agents/13653">Hire on OKX.AI</a>
+      </div>
+      <p class="hero-note">
+        8 xStocks covered: AAPLx · TSLAx · NVDAx · SPYx · GOOGLx · MSFTx · AMZNx · METAx.
+        Answers in English, Chinese, Spanish and French. If the first call is slow, the host is waking — call it twice.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── TRY LIVE ── -->
+  <section class="band" id="try">
+    <div class="wrap">
+      <div class="band-head center">
+        <p class="kicker">Try live · free via MCP</p>
+        <h2>Ask about any of the 8 xStocks.</h2>
+        <p>This calls the same free MCP endpoint any agent can hit — live data, no signup, no wallet. Paid REST tiers below.</p>
+      </div>
+      <div class="trybox frame slab">
+        <div class="tryrow">
+          <input id="sym" type="text" maxlength="20" placeholder="AAPLx" value="NVDAx" aria-label="Token symbol" />
+          <select id="lang" aria-label="Response language">
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
+        <div class="tryrow">
+          <button class="btn btn-sm" id="btnId" type="button">Identify — instant</button>
+          <button class="btn btn-sm btn-primary" id="btnGo" type="button">Full report — ~20s</button>
+        </div>
+        <p id="tryStatus" role="status"></p>
+        <pre id="tryOut">Your answer appears here.</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRICING ── -->
+  <section class="band" id="pricing">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="kicker">Pricing · pay per call</p>
+        <h2>Free to meet. Paid to dig.</h2>
+        <p>Discovery and agent access stay open. Depth is settled per call in USDT0 on X Layer via x402 — no signup, no API key, the HTTP 402 is the invoice.</p>
+      </div>
+      <div class="cards">
+        <div class="card frame slab">
+          <span class="tag">Agents</span>
+          <h3>MCP access</h3>
+          <p class="price">$0.00<small> / always</small></p>
+          <p>All 5 tools in Claude, Cursor, OpenCode. The demo window — point your agent at one URL and ask.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Identify</h3>
+          <p class="price">$0.15<small> / call</small></p>
+          <p>Issuer, underlying, chain, official docs. Never guesses — unknown symbols return the supported list.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Preview</h3>
+          <p class="price">$0.15<small> / call</small></p>
+          <p>Capped identity-only report. Zero external fetches — the cheapest way to check coverage.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Full report</h3>
+          <p class="price">$0.25<small> / call</small></p>
+          <ul>
+            <li>Backing quotes + premium math</li>
+            <li>Holders, pools, 30-day range</li>
+            <li>9 risks, SEC filings, unknowns</li>
+          </ul>
+        </div>
+        <div class="card frame slab">
+          <h3>Compare ×4</h3>
+          <p class="price">$0.50<small> / call</small></p>
+          <p>Up to 4 assets side by side with per-category leaders, premium deltas and shared-whale flags.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SETUP ── -->
+  <section class="band" id="setup">
+    <div class="wrap">
+      <div class="band-head center">
+        <p class="kicker">Setup · about 30 seconds</p>
+        <h2>One URL, in whatever you already code in.</h2>
+        <p>Uzam speaks MCP. Point your editor at one address and ask — in English, Chinese, Spanish or French.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Choose your coding agent"></div>
+      <div id="panels"></div>
+      <p class="bridge">
+        Every setup below points at <code>https://uzam-m3pi.onrender.com/mcp</code>.
+        Stdio-only client? Bridge it:
+        <code>npx -y mcp-remote https://uzam-m3pi.onrender.com/mcp</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── API ── -->
+  <section class="band" id="api">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="kicker">API · REST + x402</p>
+        <h2>Built for agents first.</h2>
+        <p>Free discovery, paid depth. Unpaid calls to paid routes return <code>402 Payment Required</code> — the invoice is in the header. Machine-readable contract at <code>/.well-known/x402</code>.</p>
+      </div>
+      <div class="stack">
+        <div>
+          <p class="step-label">Free discovery — identify (MCP, no payment)</p>
+          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"identify_asset",
+       "arguments":{"symbol":"AAPLx","lang":"en"}}}'</pre><button class="copy" type="button">Copy</button></div>
+        </div>
+        <div>
+          <p class="step-label">Paid depth — full report ($0.25 via x402)</p>
+          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/api/research \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"NVDAx","focus":"full","lang":"zh"}'
+# → 402 + PAYMENT-REQUIRED on first call; pay 0.25 USDT0 on X Layer, replay with the signature, get the dossier.</pre><button class="copy" type="button">Copy</button></div>
+        </div>
+        <div>
+          <p class="step-label">Agent install snippet</p>
+          <div class="code"><pre class="codeblock">{
+  "mcpServers": {
+    "uzam": { "url": "https://uzam-m3pi.onrender.com/mcp" }
+  }
+}
+# Then ask: "Use Uzam to compare AAPLx vs TSLAx backing and biggest unanswered risks."</pre><button class="copy" type="button">Copy</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── GUARDRAILS ── -->
+  <section class="band" id="trust">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="kicker">Trust · guardrails, not vibes</p>
+        <h2>What Uzam refuses to do.</h2>
+        <p>The rules are in code, not in prompts — so they hold no matter which agent calls.</p>
+      </div>
+      <div class="cards">
+        <div class="card frame slab">
+          <h3>Never invents</h3>
+          <p>Unknown symbols return the supported list. Missing data returns <code>missing[]</code>, never a plausible fake. No contract is ever hardcoded.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Claim vs fact</h3>
+          <p>Issuer statements are labeled CLAIM until independently verified. Grades cap at MEDIUM on issuer word alone — HIGH needs multiple sources plus tokenlist confirmation.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Unknowns stated</h3>
+          <p>Every report ends with what couldn't be proven and what would change the conclusion. "Custodian UNKNOWN" beats a confident lie.</p>
+        </div>
+        <div class="card frame slab">
+          <h3>Never "safe"</h3>
+          <p>Nine fixed risk categories, ranked high → low. The word "safe" appears nowhere in the codebase — only observed severity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="foot">
+    <span><a href="https://www.okx.ai/agents/13653">ASP #13653 on OKX.AI</a> · <a href="https://github.com/zachbuilds26/uzam">source</a> · <a href="/health">health</a> · <a href="/openapi.json">openapi</a></span>
+    <span>Settled on X Layer (196) · USDT0 via x402</span>
+  </div>
+  <p class="disclaimer">Research only, not financial advice. Tokenized equities carry issuer, custody, redemption and regulatory risk, including total loss. Uzam provides evidenced analysis of listed instruments; it does not execute trades or custody funds.</p>
+</footer>
+
+<script>
+/* Splash, setup tabs, copy buttons, and the live try-widget. */
+(function () {
+  var splash = document.getElementById('splash');
+  if (!splash) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    splash.remove();
+    return;
+  }
+  requestAnimationFrame(function () { splash.classList.add('typing'); });
+  setTimeout(function () { splash.classList.add('done'); }, 1400);
+  setTimeout(function () { splash.remove(); }, 1800);
+})();
+
+var MCP_URL = 'https://uzam-m3pi.onrender.com/mcp';
+var AGENTS = [
+  {
+    id: 'claude', name: 'Claude Code',
+    note: 'One command, no file to edit.',
+    steps: [
+      ['Add Uzam', 'claude mcp add --transport http uzam ' + MCP_URL],
+      ['Then just ask', 'Use Uzam to research NVDAx in Chinese. Which language will it ask me for? It asks you.']
+    ]
+  },
+  {
+    id: 'cursor', name: 'Cursor',
+    note: 'Global at ~/.cursor/mcp.json, or .cursor/mcp.json to scope it to one project.',
+    steps: [
+      ['~/.cursor/mcp.json', '{\n  "mcpServers": {\n    "uzam": {\n      "url": "' + MCP_URL + '"\n    }\n  }\n}']
+    ]
+  },
+  {
+    id: 'opencode', name: 'OpenCode',
+    note: 'Global at ~/.config/opencode/opencode.jsonc. Uzam needs a long timeout — full reports take ~20s.',
+    steps: [
+      ['opencode.jsonc', '{\n  "mcp": {\n    "uzam": {\n      "type": "remote",\n      "url": "' + MCP_URL + '",\n      "enabled": true,\n      "timeout": 180000\n    }\n  }\n}']
+    ]
+  }
+];
+
+var tabsEl = document.querySelector('.tabs');
+var panelsEl = document.getElementById('panels');
+var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+AGENTS.forEach(function (a, i) {
+  var tab = document.createElement('button');
+  tab.className = 'tab';
+  tab.type = 'button';
+  tab.id = 'tab-' + a.id;
+  tab.setAttribute('role', 'tab');
+  tab.setAttribute('aria-controls', 'panel-' + a.id);
+  tab.setAttribute('aria-selected', String(i === 0));
+  tab.textContent = a.name;
+  tabsEl.appendChild(tab);
+
+  var panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-' + a.id;
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', 'tab-' + a.id);
+  panel.hidden = i !== 0;
+  panel.innerHTML =
+    '<h3>' + a.name + '</h3><p class="note">' + a.note + '</p>' +
+    a.steps.map(function (pair) {
+      return '<p class="step-label">' + esc(pair[0]) + '</p><div class="code"><pre class="codeblock">' + esc(pair[1]) +
+        '</pre><button class="copy" type="button">Copy</button></div>';
+    }).join('');
+  panelsEl.appendChild(panel);
+
+  tab.addEventListener('click', function () {
+    var tabs = tabsEl.children;
+    for (var t = 0; t < tabs.length; t++) tabs[t].setAttribute('aria-selected', String(tabs[t] === tab));
+    var panels = panelsEl.children;
+    for (var p = 0; p < panels.length; p++) panels[p].hidden = panels[p] !== panel;
+  });
+});
+
+document.addEventListener('click', function (ev) {
+  var btn = ev.target.closest ? ev.target.closest('.copy') : null;
+  if (!btn) return;
+  var pre = btn.parentElement.querySelector('pre');
+  if (!pre) return;
+  var done = function (label) {
+    btn.textContent = label;
+    setTimeout(function () { btn.textContent = 'Copy'; }, 2200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(pre.textContent).then(function () { done('Copied'); }, function () { done('Press Ctrl+C'); });
+  } else {
+    var r = document.createRange();
+    r.selectNodeContents(pre);
+    var sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    done('Press Ctrl+C');
+  }
+});
+
+/* ── Try widget: free MCP calls from the browser ── */
+(function () {
+  var sym = document.getElementById('sym');
+  var lang = document.getElementById('lang');
+  var out = document.getElementById('tryOut');
+  var status = document.getElementById('tryStatus');
+  var btnId = document.getElementById('btnId');
+  var btnGo = document.getElementById('btnGo');
+  if (!sym || !out) return;
+
+  function setBusy(busy, label) {
+    btnId.disabled = busy;
+    btnGo.disabled = busy;
+    status.className = busy ? '' : status.className;
+    if (busy) status.textContent = label;
+  }
+
+  function mcpCall(tool, args) {
+    return fetch('/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: tool, arguments: args } })
+    }).then(function (res) { return res.text(); }).then(function (text) {
+      var lines = text.split('\n').filter(function (l) { return l.indexOf('data: ') === 0; });
+      if (lines.length === 0) throw new Error('No MCP data in response (host may be waking — try again).');
+      var msg = JSON.parse(lines[lines.length - 1].slice(6));
+      if (msg.error) throw new Error(msg.error.message || 'MCP error');
+      var content = (msg.result && msg.result.content && msg.result.content[0]) || {};
+      if (msg.result && msg.result.isError) throw new Error(content.text || 'Tool error');
+      return JSON.parse(content.text || '{}');
+    });
+  }
+
+  function cleanSymbol() {
+    var s = (sym.value || '').trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(s)) throw new Error('Enter a ticker like AAPLx or NVDAx.');
+    return s;
+  }
+
+  function renderIdentify(d) {
+    if (!d.found) return 'Not in registry. Supported: ' + (d.supported_symbols || []).join(', ') + '\n' + (d.uncertainty || '');
+    var L = [];
+    L.push(d.symbol + ' — ' + d.name);
+    L.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
+    L.push('Underlying: ' + (d.underlying_asset || ''));
+    L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')');
+    L.push('Docs: ' + d.official_website);
+    (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
+    return L.join('\n');
+  }
+
+  btnId.addEventListener('click', function () {
+    var s;
+    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
+    setBusy(true, 'Asking Uzam…');
+    out.textContent = '…';
+    mcpCall('identify_asset', { symbol: s, lang: lang.value }).then(function (d) {
+      out.textContent = renderIdentify(d);
+      status.textContent = 'Free via MCP · ' + new Date().toISOString();
+      status.className = '';
+    }).catch(function (e) {
+      out.textContent = 'Failed: ' + e.message;
+      status.textContent = 'Error — retry, or check /health.';
+      status.className = 'err';
+    }).then(function () { setBusy(false); });
+  });
+
+  btnGo.addEventListener('click', function () {
+    var s;
+    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
+    setBusy(true, 'Full research runs ~20s (OKX + issuer pages + SEC + news)…');
+    out.textContent = 'Gathering evidence…';
+    mcpCall('research_asset', { symbol: s, focus: 'full', lang: lang.value }).then(function (d) {
+      out.textContent = d.summary || JSON.stringify(d, null, 2).slice(0, 6000);
+      status.textContent = 'Free via MCP · full dossier above.';
+      status.className = '';
+    }).catch(function (e) {
+      out.textContent = 'Failed: ' + e.message;
+      status.textContent = 'Error — retry, or check /health.';
+      status.className = 'err';
+    }).then(function () { setBusy(false); });
+  });
+})();
+</script>
+</body>
+</html>
