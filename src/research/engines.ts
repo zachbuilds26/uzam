@@ -23,6 +23,8 @@ type RegistryAsset = {
   chains: string[];
   chainIds: number[];
   contract_addresses: string[];
+  product_page?: string;
+  issuer_published_contract?: string;
   official_website: string;
   official_documents: string[];
 };
@@ -177,8 +179,7 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   // Independent check: does the public tokenlist list this exact contract on 196?
   const extra_evidence: AnyObj[] = [];
   let tokenlist_check: AnyObj = { checked: false };
-  const tl = await verifyTokenlist(contract);
-  if (tl.error) {
+  const tl = await verifyTokenlist(contract);  if (tl.error) {
     missing.push(`tokenlist: ${tl.error}`);
     tokenlist_check = { checked: false, error: tl.error };
   } else if (tl.listed) {
@@ -193,6 +194,25 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   } else {
     tokenlist_check = { checked: true, listed: false, matched_symbol: null };
     missing.push("tokenlist: contract not found in the public xStocks tokenlist for chain 196");
+  }
+
+  // Second independent check: OKX-resolved vs issuer-published contract.
+  // Agreement is Tier-1-flavored corroboration; mismatch becomes contradiction #4.
+  let contract_crosscheck: AnyObj = { checked: false };
+  const published = asset.issuer_published_contract ?? null;
+  if (published && /^0x[0-9a-fA-F]{40}$/.test(published)) {
+    if (published.toLowerCase() === contract.toLowerCase()) {
+      contract_crosscheck = { checked: true, agrees: true };
+      extra_evidence.push({
+        claim: "OKX-resolved contract matches the issuer-published contract for this symbol.",
+        source_title: "xStocks product data (issuer-published addresses)",
+        source_url: asset.product_page ?? "https://xstocks.fi/products",
+        excerpt: `Contract ${contract} resolved via OKX search is identical to the address xStocks publishes for ${asset.symbol} — two independent sources agree this is the genuine token.`,
+        basis: "fact", source_type: "official_issuer" as SourceType, tier: 1, confidence: "MEDIUM", retrieved_at: now(),
+      });
+    } else {
+      contract_crosscheck = { checked: true, agrees: false, published, resolved: contract };
+    }
   }
 
   const top = holders
@@ -219,6 +239,7 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
     search_price: hit?.price ?? null,
     stock_profile: advanced?.stockProfile ?? null,
     tokenlist_check,
+    contract_crosscheck,
     extra_evidence,
     supply: info?.circSupply ? { circulating: info.circSupply } : {},
     holders_count: info?.holders ?? hit?.holders ?? null,
@@ -474,6 +495,19 @@ export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): Any
       source_b: { name: "xStocks tokenlist (chain 196)", value: tl.matched_symbol },
       status: "conflict",
       recommended_action: "Do not assume these are the same product — verify the contract in the issuer's Final Terms.",
+    });
+  }
+  // Check 4: OKX-resolved contract vs the issuer-published contract
+  // (from xStocks' own product data). A mismatch smells like a lookalike token.
+  const published = asset.issuer_published_contract ?? null;
+  const resolved = Array.isArray(onchain?.contracts) && onchain.contracts[0] ? String(onchain.contracts[0]) : null;
+  if (published && resolved && published.toLowerCase() !== resolved.toLowerCase()) {
+    out.push({
+      issue: `Contract mismatch: OKX search resolved ${resolved}, but xStocks publishes ${published} for ${asset.symbol}.`,
+      source_a: { name: "OKX token search (chainIndex 196)", value: resolved },
+      source_b: { name: "xStocks product data (issuer-published)", value: published },
+      status: "conflict",
+      recommended_action: "Treat the token as unverified — one of these is a lookalike. Confirm via the issuer's Final Terms before any use.",
     });
   }
   return out;

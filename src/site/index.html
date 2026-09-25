@@ -527,6 +527,8 @@ document.addEventListener('click', function (ev) {
     L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')' + (d.chain_info && d.chain_info.explorer ? ' — ' + d.chain_info.explorer : ''));
     if (d.live && d.live.available) L.push('Live: $' + d.live.price + ' (' + (d.live.data_timestamp || '').slice(0, 16).replace('T', ' ') + ' UTC)');
     else if (d.live) L.push('Live price unavailable — ' + liveHuman(d.live.reason));
+    if (d.product_page) L.push('Product page: ' + d.product_page);
+    if (d.issuer_published_contract) L.push('Issuer-published contract: ' + d.issuer_published_contract + (d.issuer_contract_explorer ? ' — ' + d.issuer_contract_explorer : ''));
     L.push('Official docs:');
     (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
     return L.join('\n');

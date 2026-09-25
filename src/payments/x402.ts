@@ -157,6 +157,11 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
         underlying_asset: asset.underlying_asset, underlying: asset.underlying ?? null,
         chains: asset.chains, chainIds: asset.chainIds,
         official_website: asset.official_website, official_documents: asset.official_documents,
+        product_page: asset.product_page ?? null,
+        issuer_published_contract: asset.issuer_published_contract ?? null,
+        issuer_contract_explorer: asset.issuer_published_contract
+          ? `https://www.okx.com/web3/explorer/xlayer/token/${asset.issuer_published_contract}`
+          : null,
         live,
       },
     });

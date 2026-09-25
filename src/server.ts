@@ -42,6 +42,8 @@ type RegistryAsset = {
   chains: string[];
   chainIds: number[];
   contract_addresses: string[];
+  product_page?: string;
+  issuer_published_contract?: string;
   official_website: string;
   official_documents: string[];
 };
@@ -57,6 +59,7 @@ const registry = z.object({
     underlying: z.object({ ticker: z.string(), exchange: z.string(), cik: z.string().nullable(), sec_filings: z.string() }).optional(),
     chains: z.array(z.string()), chainIds: z.array(z.number()),
     contract_addresses: z.array(z.string()),
+    product_page: z.string().optional(), issuer_published_contract: z.string().optional(),
     official_website: z.string(), official_documents: z.array(z.string()),
   })),
 }).parse(registryJson) as { chain: { name: string; chainId: number; chainIndex: number; rpc?: string; explorer?: string }; tokenlist: string; tokenlist_raw?: string; issuer_docs?: string; assets: RegistryAsset[] };
@@ -130,6 +133,11 @@ const handler = createMcpHandler(() => {
                   rpc: registry.chain.rpc ?? null,
                   explorer: registry.chain.explorer ?? null,
                 },
+                product_page: asset.product_page ?? null,
+                issuer_published_contract: asset.issuer_published_contract ?? null,
+                issuer_contract_explorer: asset.issuer_published_contract
+                  ? `https://www.okx.com/web3/explorer/xlayer/token/${asset.issuer_published_contract}`
+                  : null,
                 contract_addresses: asset.contract_addresses,
                 contracts_note:
                   asset.contract_addresses.length === 0
