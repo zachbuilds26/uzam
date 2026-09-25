@@ -8,7 +8,7 @@ and calls research tools. Uzam gathers and cites — the agent reasons.
 - **Live MCP:** `https://uzam-m3pi.onrender.com/mcp`
 - **Health:** `https://uzam-m3pi.onrender.com/health`
 - **Hackathon:** OKX Dev Day 2026 — primary track OKX AI (Agents), secondary X Layer RWA
-- **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx
+- **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx, NFLXx, AMDx, COINx, HOODx, AVGOx, JPMx, Vx, PLTRx
 
 ## Tools
 

@@ -250,6 +250,246 @@
       ],
       "product_page": "https://xstocks.fi/products?search=METAx",
       "issuer_published_contract": "0x96702be57cd9777f835117a809c7124fe4ec989a"
+    },
+    {
+      "symbol": "NFLXx",
+      "name": "Netflix xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "NFLX (Netflix Inc. common stock)",
+      "underlying": {
+        "ticker": "NFLX",
+        "exchange": "NASDAQ",
+        "cik": "1065280",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001065280&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=NFLXx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=NFLXx",
+      "issuer_published_contract": "0xa6a65ac27e76cd53cb790473e4345c46e5ebf961"
+    },
+    {
+      "symbol": "AMDx",
+      "name": "AMD xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "AMD (Advanced Micro Devices, Inc. common stock)",
+      "underlying": {
+        "ticker": "AMD",
+        "exchange": "NASDAQ",
+        "cik": "2488",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000002488&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=AMDx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=AMDx",
+      "issuer_published_contract": "0x3522513e5f146a2006e2901b05f16b2821485e19"
+    },
+    {
+      "symbol": "COINx",
+      "name": "Coinbase xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "COIN (Coinbase Global, Inc. common stock)",
+      "underlying": {
+        "ticker": "COIN",
+        "exchange": "NASDAQ",
+        "cik": "1679788",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001679788&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=COINx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=COINx",
+      "issuer_published_contract": "0x364f210f430ec2448fc68a49203040f6124096f0"
+    },
+    {
+      "symbol": "HOODx",
+      "name": "Robinhood xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "HOOD (Robinhood Markets, Inc. common stock)",
+      "underlying": {
+        "ticker": "HOOD",
+        "exchange": "NASDAQ",
+        "cik": "1783879",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001783879&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=HOODx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=HOODx",
+      "issuer_published_contract": "0xe1385fdd5ffb10081cd52c56584f25efa9084015"
+    },
+    {
+      "symbol": "AVGOx",
+      "name": "Broadcom xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "AVGO (Broadcom Inc. common stock)",
+      "underlying": {
+        "ticker": "AVGO",
+        "exchange": "NASDAQ",
+        "cik": "1730168",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001730168&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=AVGOx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=AVGOx",
+      "issuer_published_contract": "0x38bac69cbbd28156796e4163b2b6dcb81e336565"
+    },
+    {
+      "symbol": "JPMx",
+      "name": "JPMorgan xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "JPM (JPMorgan Chase & Co. common stock)",
+      "underlying": {
+        "ticker": "JPM",
+        "exchange": "NYSE",
+        "cik": "19617",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000019617&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=JPMx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=JPMx",
+      "issuer_published_contract": "0xd9fc3e075d45254a1d834fea18af8041207dea0a"
+    },
+    {
+      "symbol": "Vx",
+      "name": "Visa xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "V (Visa Inc. common stock)",
+      "underlying": {
+        "ticker": "V",
+        "exchange": "NYSE",
+        "cik": "1403161",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001403161&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=Vx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=Vx",
+      "issuer_published_contract": "0x2363fd1235c1b6d3a5088ddf8df3a0b3a30c5293"
+    },
+    {
+      "symbol": "PLTRx",
+      "name": "Palantir xStock",
+      "asset_type": "tokenized_stock",
+      "issuer": "xStocks / Backed Finance",
+      "issuer_legal": "Backed Assets (JE) Limited",
+      "underlying_asset": "PLTR (Palantir Technologies Inc. common stock)",
+      "underlying": {
+        "ticker": "PLTR",
+        "exchange": "NASDAQ",
+        "cik": "1321655",
+        "sec_filings": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001321655&type=&dateb=&owner=include&count=10"
+      },
+      "chains": [
+        "X Layer"
+      ],
+      "chainIds": [
+        196
+      ],
+      "contract_addresses": [],
+      "official_website": "https://xstocks.fi/",
+      "official_documents": [
+        "https://xstocks.fi/",
+        "https://docs.xstocks.fi/docs/product-legal-overview",
+        "https://github.com/backed-fi/cowswap-xstocks-tokenlist",
+        "https://xstocks.fi/products?search=PLTRx"
+      ],
+      "product_page": "https://xstocks.fi/products?search=PLTRx",
+      "issuer_published_contract": "0x6d482cec5f9dd1f05ccee9fd3ff79b246170f8e2"
     }
   ]
 }
