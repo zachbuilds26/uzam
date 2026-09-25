@@ -83,7 +83,7 @@ Risk categories (fixed list): issuer, backing, redemption, liquidity, smart_cont
 - Server: `express` + `zod` validation + `dotenv`
 - Docs fetch: native `fetch` + simple HTML text extract for MVP
 - Data: local JSON file, no Postgres for MVP (add later if needed)
-- Deploy: Render Web Service, `npm run build && npm start`, health check `/health`, public `https://uzam-m3pi.onrender.com/mcp`
+- Deploy: Railway service, `npm run build && npm start`, health check `/health`, public `https://uzam-production-95f9.up.railway.app/mcp`
 
 Env vars (never commit — see .env.example (seven vars incl. PAY_TO_ADDRESS)):
 ```
@@ -113,7 +113,7 @@ Render free tier: 512 MB RAM, shared CPU, sleeps after inactivity — fine for r
 
 Other tools (no install size, web only):
 - GitHub account (to connect Render)
-- Render account (render.com)
+- Railway account (railway.app)
 - OKX dev portal key for Onchain OS Market (from https://web3.okx.com/onchainos/dev-portal/project) — Market read-only key only
 
 ## 8. Build order (for 17-25 Sept online build)
@@ -124,7 +124,7 @@ Phase 4: `WebResearchProvider` interface (search/fetch stub) + doc link return.
 Phase 5: `analyze_backing` with FACT/CLAIM/UNKNOWN split.
 Phase 6: `research_asset` orchestrator + risks + unknowns + confidence.
 Phase 7: `compare_assets`.
-Phase 8: Deploy to Render, connect Claude Desktop/Cursor to `https://uzam-m3pi.onrender.com/mcp`, demo: "Compare AAPLx vs TSLAx backing + biggest unanswered risks?"
+Phase 8: Deploy to Railway, connect Claude Desktop/Cursor to `https://uzam-production-95f9.up.railway.app/mcp`, demo: "Compare AAPLx vs TSLAx backing + biggest unanswered risks?"
 Phase 9 (shipped): paid REST via x402 (identify $0.15, preview $0.15, research $0.25, compare $0.50), landing page at `/` with live try-widget, 4-language reports, 16 assets, approved A2MCP listing on OKX.AI (#13653).
 
 Do NOT build: dashboard, login, token, trading, wallet connect, Postgres, vector DB, dozens of chains.
