@@ -5,289 +5,405 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Uzam — RWA intelligence for xStocks your agent can cite</title>
-<meta name="description" content="Uzam researches xStocks tokenized equities on X Layer: quoted backing evidence, onchain holders and liquidity, 9-category risks, SEC filings — and states what it cannot prove instead of guessing. MCP + x402 API. Listed on OKX.AI." />
+<meta name="description" content="Uzam researches xStocks tokenized equities on X Layer: quoted backing evidence, onchain holders and liquidity, 9-category risks, SEC filings — and states what it cannot prove instead of guessing." />
 <meta property="og:title" content="Uzam — RWA intelligence for xStocks" />
 <meta property="og:description" content="One call: backing evidence, premium, holders, risks, unknowns. Never guesses. Live on X Layer (196)." />
-<meta name="theme-color" content="#000000" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z' fill='none' stroke='%2352FF00' stroke-width='10'/%3E%3Ccircle cx='50' cy='50' r='12' fill='%2352FF00'/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#0f2623" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z' fill='none' stroke='%239decce' stroke-width='10'/%3E%3Ccircle cx='50' cy='50' r='12' fill='%239decce'/%3E%3C/svg%3E" />
 <style>
-  /* Somnus grammar, Uzam palette: black + signal greens.
-     #52FF00 primary, #66FF00 hover, #38BD00 deep. Black ink on green.
-     Thick white frames, hard offset slabs, square corners, grid backdrop. */
+  /*
+   * Uzam's editorial system: the structure and proportions take their cue from
+   * the supplied reference, while the copy, mark, controls, and product UI stay
+   * distinctly Uzam.
+   */
+  @font-face {
+    font-family: "Uzam Grotesk";
+    src: url("https://cdn.prod.website-files.com/691dc2f09a7586ced79501b2/691f24a9861ef487cc9f4bd4_AktivGroteskVF_W_Basic_Wght.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Uzam Serif";
+    src: url("https://cdn.prod.website-files.com/691dc2f09a7586ced79501b2/691f24c0a4ffb4061d6a8012_Argent-Thin.woff2") format("woff2");
+    font-weight: 100;
+    font-style: normal;
+    font-display: swap;
+  }
+
   :root {
-    --background: #000000;
-    --background-deep: #000000;
-    --surface: #111111;
-    --raised: #1a1a1a;
-    --hover: #222222;
-    --line: #ffffff;
-    --ink: #ffffff;
-    --muted: #9c9c9c;
-    --faint: #6b6b6b;
-    --accent: #52FF00;
-    --accent-hover: #66FF00;
-    --accent-deep: #38BD00;
-    --accent-ink: #000000;
+    --bg: #0f2623;
+    --bg-deep: #0b1d1b;
+    --bg-soft: #10352f;
+    --mint: #9decce;
+    --mint-soft: #aac9c2;
+    --paper: #f2f5f5;
+    --muted: #7fa49c;
+    --faint: #52756e;
+    --line: rgba(170, 201, 194, 0.25);
+    --line-strong: rgba(170, 201, 194, 0.48);
+    --max: 1600px;
+    --gutter: clamp(16px, 1.7vw, 24px);
   }
+
   * { box-sizing: border-box; }
-  html { min-height: 100%; background: var(--background); scroll-behavior: smooth; }
+  html { min-height: 100%; scroll-behavior: smooth; background: var(--bg); }
   body {
-    min-height: 100vh; margin: 0; background: var(--background); color: var(--ink);
-    font-family: "Space Grotesk", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    margin: 0;
+    color: var(--mint-soft);
+    background: var(--bg);
+    font-family: "Uzam Grotesk", Arial, sans-serif;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  h1, h2, h3 { font-family: "Syne", Arial, sans-serif; margin: 0; letter-spacing: -0.045em; }
-  p { margin: 0; }
+  h1, h2, h3, p { margin: 0; }
+  h1, h2, h3 { color: var(--mint); font-weight: 100; }
+  h1, h2 { font-family: "Uzam Serif", Georgia, serif; letter-spacing: -0.045em; }
+  h3 { font-family: "Uzam Grotesk", Arial, sans-serif; font-weight: 500; letter-spacing: -0.025em; }
   a { color: inherit; }
+  button, input, select { font: inherit; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  ::selection { background: var(--mint); color: var(--bg); }
+  :focus-visible { outline: 2px solid var(--mint); outline-offset: 4px; }
   code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  ::selection { background: var(--accent); color: var(--accent-ink); }
-  section[id] { scroll-margin-top: 1rem; }
 
-  .frame { border: 2px solid var(--line); }
-  .slab { box-shadow: 4px 4px 0 0 var(--ink); }
+  .container { width: calc(100% - (var(--gutter) * 2)); max-width: var(--max); margin: 0 auto; }
+  .eyebrow {
+    color: var(--mint-soft);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .eyebrow::before {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin: 0 10px 1px 0;
+    border-radius: 50%;
+    background: var(--mint);
+    content: "";
+  }
+  .section { padding: clamp(92px, 12vw, 176px) 0; }
+  .section + .section { border-top: 1px solid var(--line); }
+  .section-heading { max-width: 660px; }
+  .section-heading h2 { margin-top: 22px; font-size: clamp(48px, 6.2vw, 88px); line-height: 0.93; }
+  .section-heading p { max-width: 600px; margin-top: 28px; color: var(--muted); font-size: 17px; line-height: 1.55; }
 
-  .grid-fade {
-    background-image:
-      linear-gradient(to right, rgba(82,255,0,0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(82,255,0,0.06) 1px, transparent 1px);
-    background-size: 42px 42px;
+  /* Header */
+  .site-header {
+    position: relative;
+    z-index: 20;
+    border-bottom: 1px solid var(--line);
+    background: rgba(15, 38, 35, 0.86);
+    backdrop-filter: blur(14px);
   }
+  .header-inner {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 36px;
+  }
+  .wordmark {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 10px;
+    color: var(--paper);
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    text-decoration: none;
+  }
+  .wordmark .hex { width: 25px; height: 25px; }
+  .primary-nav { display: flex; align-items: center; gap: clamp(18px, 2.5vw, 38px); margin-left: auto; }
+  .primary-nav a, .header-link {
+    color: var(--paper);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 180ms ease;
+  }
+  .primary-nav a:hover, .header-link:hover { color: var(--mint); }
+  .nav-with-arrow { display: inline-flex; align-items: center; gap: 6px; }
+  .nav-with-arrow::after { content: "⌄"; color: var(--muted); font-size: 14px; transform: translateY(-2px); }
+  .header-action, .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid var(--mint);
+    border-radius: 2px;
+    background: var(--mint);
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  }
+  .header-action:hover, .button:hover { border-color: var(--paper); background: var(--paper); transform: translateY(-2px); }
+  .menu-toggle { display: none; border: 0; background: none; color: var(--mint); cursor: pointer; font-size: 24px; }
 
-  /* ── splash ── */
-  #splash {
-    position: fixed; inset: 0; z-index: 9999;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--background);
-    transition: opacity 300ms ease;
+  /* Hero */
+  .hero {
+    position: relative;
+    min-height: max(830px, calc(100vh - 72px));
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--line);
   }
-  #splash.done { opacity: 0; pointer-events: none; }
-  #splash .row { display: flex; align-items: center; gap: 12px; overflow: hidden; }
-  #splash .word {
-    font-family: "Syne", Arial, sans-serif; font-size: 22px; font-weight: 600;
-    letter-spacing: -0.03em; white-space: nowrap; overflow: hidden;
-    max-width: 0; opacity: 0; transition: max-width 500ms ease, opacity 300ms ease;
+  .hero-art { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .hero-art span { position: absolute; display: block; background: #10312d; opacity: 0.72; }
+  .shape-one { width: 260px; height: 480px; right: 16%; top: 27%; clip-path: polygon(0 7%, 68% 0, 100% 10%, 100% 73%, 7% 81%); transform: rotate(-5deg); }
+  .shape-two { width: 430px; height: 340px; right: 39%; bottom: -70px; clip-path: polygon(0 18%, 72% 0, 100% 18%, 82% 100%, 20% 87%); transform: rotate(-3deg); }
+  .shape-three { width: 240px; height: 380px; right: -35px; bottom: -100px; clip-path: polygon(0 7%, 100% 0, 100% 100%, 12% 84%); opacity: 0.5; }
+  .hero::after {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgba(15, 38, 35, 0.03) 0%, rgba(15, 38, 35, 0.02) 50%, rgba(15, 38, 35, 0.3) 100%);
+    content: "";
   }
-  #splash.typing .word { max-width: 250px; opacity: 1; }
-  #splash .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+  .hero-inner { position: relative; z-index: 1; padding: 0 0 clamp(90px, 20vw, 280px); }
+  .hero h1 { max-width: 980px; margin-top: 34px; color: var(--mint-soft); font-size: clamp(58px, 8.4vw, 126px); line-height: 0.86; }
+  .hero h1 em { color: var(--mint); font-style: normal; }
+  .hero-bottom { display: grid; grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr); gap: 40px; align-items: end; margin-top: 42px; }
+  .hero-copy { max-width: 620px; color: var(--muted); font-size: 16px; line-height: 1.6; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+  .button.secondary { border-color: var(--line-strong); background: transparent; color: var(--paper); }
+  .button.secondary:hover { border-color: var(--mint); background: transparent; color: var(--mint); }
+  .hero-note { color: var(--faint); font-size: 12px; line-height: 1.5; }
 
-  /* ── header ── */
-  header.bar {
-    position: sticky; top: 0; z-index: 30;
-    background: rgba(0,0,0,0.92); backdrop-filter: blur(8px);
-    border-bottom: 2px solid var(--line);
-  }
-  .bar-in { max-width: 1120px; margin: 0 auto; padding: 0 20px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .wordmark { display: inline-flex; align-items: center; gap: 8px; font-family: "Syne", Arial, sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.03em; text-decoration: none; }
-  .wordmark .hex { width: 22px; height: 22px; flex: none; }
-  nav.links { display: flex; align-items: center; gap: 22px; font-size: 12px; font-weight: 500; color: var(--muted); }
-  nav.links a { text-decoration: none; padding: 8px 0; }
-  nav.links a:hover { color: var(--accent); }
-  nav.links a:focus { outline: none; }
-  nav.links a:focus-visible { outline: none; color: var(--accent); }
-  .bar-cta { display: flex; align-items: center; gap: 10px; }
-  .bar-link { font-size: 12px; font-weight: 600; color: var(--ink); text-decoration: none; padding: 8px 0; }
-  .bar-link:hover { color: var(--accent); }
-  @media (max-width: 720px) { nav.links .hide-sm { display: none; } }
+  /* Intro and stats */
+  .intro-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(48px, 10vw, 160px); align-items: start; }
+  .intro-grid h2 { max-width: 470px; font-size: clamp(40px, 5vw, 72px); line-height: 0.95; }
+  .intro-copy { max-width: 640px; color: var(--muted); font-size: 18px; line-height: 1.55; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 72px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
+  .stat { min-height: 160px; padding: 28px 24px; background: var(--bg); }
+  .stat strong { display: block; color: var(--mint); font-family: "Uzam Serif", Georgia, serif; font-size: clamp(42px, 5vw, 72px); font-weight: 100; line-height: 0.9; }
+  .stat span { display: block; margin-top: 18px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 
-  /* ── buttons ── */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px 20px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
-    border: 2px solid var(--line); background: transparent; color: var(--ink);
-    box-shadow: 4px 4px 0 0 var(--ink);
-    transition: transform 120ms ease, box-shadow 120ms ease, background-color 160ms ease;
-  }
-  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--ink); background: var(--surface); }
-  .btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
-  .btn svg { width: 16px; height: 16px; flex: none; }
-  .btn-primary {
-    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
-    box-shadow: 4px 4px 0 0 var(--ink);
-  }
-  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: 6px 6px 0 0 var(--ink); }
-  .btn-primary:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
-  .btn-sm { padding: 10px 14px; font-size: 12px; }
-  .btn[disabled] { opacity: 0.55; cursor: wait; transform: none; }
+  /* Strategy cards */
+  .strategy-layout { display: grid; grid-template-columns: minmax(220px, 3fr) minmax(0, 9fr); gap: clamp(50px, 10vw, 160px); }
+  .strategy-intro { position: sticky; top: 112px; align-self: start; }
+  .strategy-intro h2 { margin-top: 22px; font-size: clamp(42px, 5.4vw, 76px); line-height: 0.92; }
+  .strategy-intro p { max-width: 300px; margin-top: 28px; color: var(--muted); line-height: 1.55; }
+  .strategy-list { border-top: 1px solid var(--line); }
+  .strategy-card { display: grid; grid-template-columns: 58px minmax(0, 1fr) 26px; gap: 24px; align-items: start; padding: 30px 0; border-bottom: 1px solid var(--line); transition: padding 220ms ease, background 220ms ease; }
+  .strategy-card:hover { padding-left: 18px; padding-right: 18px; background: rgba(16, 53, 47, 0.7); }
+  .strategy-number { color: var(--faint); font-family: "Uzam Serif", Georgia, serif; font-size: 27px; }
+  .strategy-card h3 { color: var(--mint); font-size: clamp(24px, 2.5vw, 36px); line-height: 1; }
+  .strategy-card p { max-width: 570px; margin-top: 12px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .arrow { color: var(--mint); font-size: 26px; font-weight: 300; line-height: 1; transition: transform 180ms ease; }
+  .strategy-card:hover .arrow { transform: translate(4px, -4px); }
 
-  /* ── hero ── */
-  .hero { position: relative; isolation: isolate; overflow: hidden; }
-  .hero-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.6; }
-  .hero-fade { position: absolute; inset-inline: 0; bottom: 0; height: 128px; background: linear-gradient(to top, var(--background), transparent); pointer-events: none; }
-  .hero-in {
-    position: relative; z-index: 1; max-width: 896px; margin: 0 auto;
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    gap: 20px; padding: 104px 20px 56px;
+  /* Live product panel */
+  .live-section { background: var(--bg-deep); }
+  .live-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(48px, 9vw, 140px); align-items: start; }
+  .live-layout h2 { margin-top: 22px; font-size: clamp(44px, 5.5vw, 80px); line-height: 0.9; }
+  .live-layout .lead { max-width: 420px; margin-top: 26px; color: var(--muted); line-height: 1.55; }
+  .trybox { padding: 28px; border: 1px solid var(--line-strong); background: var(--bg-soft); }
+  .trybox-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+  .trybox-top strong { color: var(--paper); font-size: 14px; font-weight: 500; }
+  .trybox-top span { color: var(--mint); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .tryrow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .tryrow select {
+    min-width: 0; flex: 1 1 170px; height: 48px; padding: 0 14px;
+    border: 1px solid var(--line-strong); border-radius: 2px; outline: none;
+    background: var(--bg); color: var(--paper); cursor: pointer;
   }
-  .live-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
-  }
-  .live-badge .dot { width: 6px; height: 6px; background: var(--accent); animation: blink 1.6s steps(1) infinite; }
-  .hero h1 { font-size: clamp(30px, 4.6vw, 52px); line-height: 0.95; max-width: 16ch; }
-  .hero h1 .accent { color: var(--accent); }
-  .hero .sub { max-width: 62ch; font-size: 16px; line-height: 1.7; color: var(--muted); }
-  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; }
-  .hero-note { max-width: 60ch; font-size: 12px; line-height: 1.6; color: var(--muted); }
-  .hero-note a { color: var(--accent); text-underline-offset: 2px; }
-  .hero-note a:hover { color: var(--ink); }
+  .tryrow select:focus { border-color: var(--mint); }
+  .tryrow .button { min-height: 48px; cursor: pointer; }
+  #tryStatus { min-height: 18px; margin-top: 20px; color: var(--muted); font-size: 12px; }
+  #tryStatus.err { color: #f4a6a6; }
+  #tryOut { min-height: 100px; max-height: 360px; margin: 8px 0 0; padding: 18px; overflow: auto; border: 1px solid var(--line); background: var(--bg); color: var(--mint-soft); font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-  /* ── sections ── */
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 80px 20px; }
-  .kicker { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
-  .band-head { max-width: 640px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 48px; }
-  .band-head h2 { font-size: clamp(23px, 3.4vw, 38px); line-height: 1.02; }
-  .band-head p { font-size: 14px; line-height: 1.7; color: var(--muted); }
-  .band-head.center { text-align: center; align-items: center; margin-inline: auto; }
-  .band-head.center p { max-width: 62ch; }
+  /* Product architecture */
+  .architecture { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(48px, 10vw, 160px); }
+  .architecture h2 { margin-top: 22px; font-size: clamp(42px, 5.5vw, 80px); line-height: 0.9; }
+  .architecture-copy { max-width: 620px; color: var(--muted); font-size: 17px; line-height: 1.55; }
+  .architecture-copy code { color: var(--mint); font-size: 0.85em; }
+  .architecture-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); }
+  .architecture-card { min-height: 230px; padding: 28px; background: var(--bg); }
+  .architecture-card:nth-child(3) { grid-column: 1 / -1; }
+  .architecture-card h3 { color: var(--mint); font-size: 22px; }
+  .architecture-card p { margin-top: 18px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+  .architecture-card .card-index { display: block; margin-bottom: 48px; color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; }
 
-  /* ── cards: framed, slabbed, square ── */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-  .card { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 12px; }
-  .card h3 { font-size: 17px; }
-  .card .price { font-family: "Syne", Arial, sans-serif; font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: -0.03em; }
-  .card .price small { font-size: 13px; color: var(--muted); font-family: "Space Grotesk", Arial, sans-serif; font-weight: 500; letter-spacing: 0; }
-  .card p { font-size: 13px; line-height: 1.65; color: var(--muted); }
-  .card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
-  .card .tag { align-self: flex-start; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 8px; }
+  /* Pricing and trust */
+  .pricing-head { display: flex; justify-content: space-between; gap: 40px; align-items: end; margin-bottom: 56px; }
+  .pricing-head h2 { max-width: 640px; font-size: clamp(46px, 6vw, 84px); line-height: 0.9; }
+  .pricing-head p { max-width: 330px; color: var(--muted); line-height: 1.55; }
+  .price-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); }
+  .price-card { min-height: 290px; padding: 24px; background: var(--bg-soft); }
+  .price-card:first-child { background: var(--mint); color: var(--bg); }
+  .price-card:first-child h3, .price-card:first-child p, .price-card:first-child .price { color: var(--bg); }
+  .price-card h3 { color: var(--mint); font-size: 20px; }
+  .price { margin-top: 44px; color: var(--mint); font-family: "Uzam Serif", Georgia, serif; font-size: 48px; line-height: 0.9; }
+  .price small { color: var(--muted); font-family: "Uzam Grotesk", Arial, sans-serif; font-size: 12px; }
+  .price-card p:last-child { margin-top: 22px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .price-card:first-child p:last-child { color: rgba(15, 38, 35, 0.72); }
+  .trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 50px; background: var(--line); }
+  .trust-card { min-height: 210px; padding: 26px; background: var(--bg); }
+  .trust-card h3 { color: var(--mint); font-size: 22px; }
+  .trust-card p { margin-top: 24px; color: var(--muted); font-size: 14px; line-height: 1.55; }
 
-  /* ── try widget ── */
-  .trybox { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 900px; margin: 0 auto; }
-  .tryrow { display: flex; flex-wrap: wrap; gap: 12px; }
-  .tryrow input, .tryrow select {
-    font: inherit; font-size: 14px; color: var(--ink); background: var(--background);
-    border: 2px solid var(--line); padding: 12px 14px; min-width: 0;
-  }
-  .tryrow input { flex: 2 1 160px; text-transform: uppercase; }
-  .tryrow select { flex: 1 1 130px; }
-  .tryrow input::placeholder { color: var(--faint); }
-  #tryStatus { font-size: 12px; color: var(--muted); min-height: 18px; }
-  #tryStatus.err { color: #ff6b6b; }
-  #tryOut {
-    margin: 0; padding: 16px; overflow-x: auto; max-height: 420px; overflow-y: auto;
-    background: var(--background); border: 1px solid rgba(255,255,255,0.18);
-    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
-  }
+  /* Footer */
+  .insights { padding-bottom: clamp(96px, 12vw, 170px); }
+  .insights-layout { display: grid; grid-template-columns: minmax(230px, 4fr) minmax(0, 8fr); gap: clamp(48px, 10vw, 160px); }
+  .insights-title h2 { margin-top: 20px; font-size: clamp(46px, 6vw, 84px); line-height: 0.9; }
+  .insights-title .button { margin-top: 30px; }
+  .article-list { border-top: 1px solid var(--line); }
+  .article { display: grid; grid-template-columns: 82px 1fr 22px; gap: 22px; align-items: start; padding: 27px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .article:hover h3 { color: var(--paper); }
+  .article-index { color: var(--faint); font-family: "Uzam Serif", Georgia, serif; font-size: 26px; }
+  .article h3 { color: var(--mint); font-size: clamp(21px, 2.2vw, 30px); line-height: 1.05; }
+  .article p { margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .site-footer { border-top: 1px solid var(--line); padding: 72px 0 26px; background: var(--bg-deep); }
+  .footer-layout { display: grid; grid-template-columns: 7fr 5fr; gap: 80px; }
+  .footer-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
+  .footer-group h3 { color: var(--muted); font-size: 12px; font-weight: 500; }
+  .footer-group a { display: block; width: fit-content; margin-top: 14px; color: var(--paper); font-size: 13px; text-decoration: none; }
+  .footer-group a:hover { color: var(--mint); }
+  .newsletter h2 { color: var(--mint); font-family: "Uzam Grotesk", Arial, sans-serif; font-size: 25px; font-weight: 400; letter-spacing: -0.04em; }
+  .newsletter p { max-width: 410px; margin-top: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .subscribe { display: flex; gap: 8px; margin-top: 24px; }
+  .subscribe input { min-width: 0; flex: 1; height: 46px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--line-strong); outline: none; background: transparent; color: var(--paper); }
+  .subscribe input:focus { border-color: var(--mint); }
+  .subscribe .button { min-height: 46px; border: 0; cursor: pointer; }
+  .footer-bottom { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-top: 110px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; }
+  .footer-bottom .wordmark { color: var(--mint-soft); font-size: 17px; }
+  .disclaimer { max-width: 600px; margin-top: 14px; color: var(--faint); font-size: 11px; line-height: 1.55; }
 
-  /* ── setup tabs ── */
-  .tabs { display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: center; margin: 40px 0 20px; }
-  .tab {
-    padding: 10px 2px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-    background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
-    box-shadow: none;
-    transition: color 160ms ease, border-color 160ms ease;
+  @media (max-width: 900px) {
+    .primary-nav { gap: 16px; }
+    .primary-nav a:nth-child(2), .primary-nav a:nth-child(3), .primary-nav a:nth-child(4) { display: none; }
+    .hero { min-height: 720px; }
+    .intro-grid, .strategy-layout, .live-layout, .architecture, .insights-layout { grid-template-columns: 1fr; gap: 54px; }
+    .strategy-intro { position: static; }
+    .price-grid { grid-template-columns: repeat(2, 1fr); }
+    .price-card:last-child { grid-column: 1 / -1; }
+    .trust-grid { grid-template-columns: repeat(2, 1fr); }
+    .footer-layout { grid-template-columns: 1fr; gap: 60px; }
   }
-  .tab:hover { color: var(--ink); }
-  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-  .tab:focus { outline: none; }
-  .tab:focus-visible { outline: none; color: var(--ink); border-bottom-color: var(--accent); }
-  .panel { padding: 8px 0 24px; max-width: 900px; margin: 0 auto; }
-  .panel[hidden] { display: none; }
-  .panel h3 { font-size: 17px; margin-bottom: 8px; }
-  .panel .note { font-size: 14px; line-height: 1.65; color: var(--muted); margin-bottom: 20px; max-width: 68ch; }
-  .step-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; }
-  .step-label:first-of-type { margin-top: 0; }
-  .bridge { max-width: 900px; margin: 24px auto 0; font-size: 14px; line-height: 1.7; color: var(--muted); text-align: center; }
-
-  /* ── code blocks ── */
-  .code { position: relative; }
-  pre.codeblock {
-    margin: 0; padding: 16px 84px 16px 16px; overflow-x: auto;
-    background: var(--surface); border: 1px solid rgba(255,255,255,0.18);
-    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
-  }
-  .copy {
-    position: absolute; top: 12px; right: 12px; padding: 7px 12px;
-    font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
-    background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.25);
-    transition: transform 120ms ease, color 160ms ease, background-color 160ms ease;
-  }
-  .copy:hover { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-  .stack { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto; }
-
-  footer { border-top: 2px solid var(--line); }
-  .foot {
-    max-width: 1120px; margin: 0 auto; padding: 24px 20px;
-    display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
-    font-size: 12px; color: var(--muted);
-  }
-  .foot a { color: var(--accent); text-underline-offset: 2px; }
-  .foot a:hover { color: var(--ink); }
-  .disclaimer { max-width: 1120px; margin: 0 auto; padding: 0 20px 24px; font-size: 11px; line-height: 1.6; color: var(--faint); }
-
-  @media (max-width: 640px) {
-    .hero-in { padding: 76px 20px 44px; }
-    .wrap { padding: 56px 20px; }
-    .hero-cta .btn { width: 100%; }
-    input, select, textarea { font-size: 16px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
-    #splash { display: none; }
+  @media (max-width: 600px) {
+    :root { --gutter: 20px; }
+    .header-inner { min-height: 64px; }
+    .primary-nav, .header-link { display: none; }
+    .menu-toggle { display: block; }
+    .header-action { margin-left: auto; min-height: 38px; padding: 0 12px; font-size: 11px; }
+    .hero { min-height: 700px; }
+    .hero h1 { font-size: clamp(53px, 16vw, 86px); }
+    .hero-bottom { grid-template-columns: 1fr; gap: 18px; }
+    .stats, .architecture-cards, .trust-grid, .price-grid { grid-template-columns: 1fr; }
+    .price-card:last-child, .architecture-card:nth-child(3) { grid-column: auto; }
+    .strategy-card { grid-template-columns: 34px 1fr 20px; gap: 12px; }
+    .trybox { padding: 20px; }
+    .pricing-head { display: block; }
+    .pricing-head p { margin-top: 24px; }
+    .footer-groups { grid-template-columns: repeat(2, 1fr); row-gap: 40px; }
+    .footer-bottom { display: block; margin-top: 70px; }
+    .footer-bottom > span { display: block; margin-top: 18px; }
+    .site-header.menu-open .primary-nav {
+      position: absolute;
+      top: 64px;
+      right: 20px;
+      left: 20px;
+      display: grid;
+      gap: 0;
+      padding: 8px 18px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-deep);
+    }
+    .site-header.menu-open .primary-nav a { display: block; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .site-header.menu-open .primary-nav a:last-child { border-bottom: 0; }
   }
 </style>
 </head>
 <body>
-
-<div id="splash" aria-hidden="true">
-  <div class="row">
-    <svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>
-    <span class="word">UZAM<span class="caret"></span></span>
-  </div>
-</div>
-
-<header class="bar">
-  <div class="bar-in">
+<header class="site-header">
+  <div class="container header-inner">
     <a class="wordmark" href="#top" aria-label="Uzam home">
-      <svg class="hex" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>UZAM
+      <svg class="hex" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="currentColor"/></svg>
+      <span>UZAM</span>
     </a>
-    <nav class="links" aria-label="Main navigation">
-      <a href="#try">Try live</a>
-      <a href="#pricing" class="hide-sm">Pricing</a>
-      <a href="https://www.okx.ai/agents/13653">OKX.AI</a>
+    <nav class="primary-nav" aria-label="Main navigation">
+      <a class="nav-with-arrow" href="#about">About</a>
+      <a class="nav-with-arrow" href="#strategies">Capabilities</a>
+      <a class="nav-with-arrow" href="#pricing">Pricing</a>
+      <a href="#api">For developers</a>
+      <a href="#insights">Insights</a>
     </nav>
-    <div class="bar-cta">
-      <a class="bar-link" href="/health">Live health</a>
-    </div>
+    <a class="header-action" href="#try">Try live</a>
+    <button class="menu-toggle" type="button" aria-label="Open menu">☰</button>
   </div>
 </header>
 
 <main id="top">
-  <!-- ── HERO ── -->
   <section class="hero">
-    <div class="hero-grid grid-fade" aria-hidden="true"></div>
-    <div class="hero-fade" aria-hidden="true"></div>
-    <div class="hero-in">
-      <p class="live-badge"><span class="dot" aria-hidden="true"></span>Live on X Layer · Chain 196 · ASP #13653 on OKX.AI</p>
-      <h1>Tokenized-stock research your agent can <span class="accent">cite.</span></h1>
-      <p class="sub">
-        Uzam digs through issuer docs, SEC filings, and X Layer onchain data so your agent
-        doesn't have to. Quoted backing evidence, price-vs-reference premium, holders and
-        liquidity, 9-category risks — and it states what it cannot prove instead of guessing.
-      </p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="#try">
-          Try it live — free
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
-        </a>
-        <a class="btn" href="https://www.okx.ai/agents/13653">Hire on OKX.AI</a>
+    <div class="hero-art" aria-hidden="true"><span class="shape-one"></span><span class="shape-two"></span><span class="shape-three"></span></div>
+    <div class="container hero-inner">
+      <p class="eyebrow">Live on X Layer · Chain 196 · Agent-ready</p>
+      <h1>Evidence for the<br />onchain <em>economy.</em></h1>
+      <div class="hero-bottom">
+        <div>
+          <p class="hero-copy">Uzam researches tokenized stocks across issuer documents, SEC filings, and live X Layer data so your agent can answer with evidence, not confidence theatre.</p>
+          <div class="hero-actions">
+            <a class="button" href="#try">Try it live <span aria-hidden="true">↗</span></a>
+            <a class="button secondary" href="#api">Build with Uzam</a>
+          </div>
+        </div>
+        <p class="hero-note">Backing evidence, price-vs-reference premium, holders, liquidity, risks, and unknowns — in one cited report.</p>
       </div>
     </div>
   </section>
 
-  <!-- ── TRY LIVE ── -->
-  <section class="band" id="try">
-    <div class="wrap">
-      <div class="band-head center">
-        <p class="kicker">Try live · free via MCP</p>
-        <h2>Ask about any of the 16 xStocks.</h2>
-        <p>This calls the same free MCP endpoint any agent can hit — live data, no signup, no wallet. Paid REST tiers below.</p>
+  <section class="section" id="about">
+    <div class="container">
+      <div class="intro-grid">
+        <div><p class="eyebrow">Research infrastructure</p><h2>Clarity for assets that move differently.</h2></div>
+        <div>
+          <p class="intro-copy">Tokenized equities need more than a price feed. Uzam connects issuer claims, official documents, market data, and onchain behavior into an evidence-backed dossier that agents can actually cite.</p>
+          <div class="stats">
+            <div class="stat"><strong>16</strong><span>xStocks covered</span></div>
+            <div class="stat"><strong>9</strong><span>risk categories</span></div>
+            <div class="stat"><strong>196</strong><span>X Layer chain</span></div>
+          </div>
+        </div>
       </div>
-      <div class="trybox frame slab">
+    </div>
+  </section>
+
+  <section class="section" id="strategies">
+    <div class="container strategy-layout">
+      <div class="strategy-intro">
+        <p class="eyebrow">What Uzam does</p>
+        <h2>Research built for conviction.</h2>
+        <p>From first-pass identity to a full dossier, every layer is designed to make the unknowns visible.</p>
+      </div>
+      <div class="strategy-list">
+        <article class="strategy-card"><span class="strategy-number">01</span><div><h3>Identify the asset</h3><p>Issuer, underlying equity, chain, official product pages, and the exact contract — never guessed or hardcoded.</p></div><span class="arrow">↗</span></article>
+        <article class="strategy-card"><span class="strategy-number">02</span><div><h3>Verify the evidence</h3><p>Quoted backing claims are separated from independently observed facts across issuer docs, filings, and market sources.</p></div><span class="arrow">↗</span></article>
+        <article class="strategy-card"><span class="strategy-number">03</span><div><h3>Read the market</h3><p>Premium versus reference, holders, concentration, liquidity, pools, and 30-day range from onchain data.</p></div><span class="arrow">↗</span></article>
+        <article class="strategy-card"><span class="strategy-number">04</span><div><h3>Surface the risks</h3><p>Nine fixed risk categories ranked high to low, with the missing evidence and the event that could change the conclusion.</p></div><span class="arrow">↗</span></article>
+        <article class="strategy-card"><span class="strategy-number">05</span><div><h3>Deliver it to agents</h3><p>MCP for free discovery, REST plus x402 for paid depth, and machine-readable output designed for agent workflows.</p></div><span class="arrow">↗</span></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section live-section" id="try">
+    <div class="container live-layout">
+      <div>
+        <p class="eyebrow">Live research · free via MCP</p>
+        <h2>Ask a better question.</h2>
+        <p class="lead">Try the same endpoint your agent can call. Pick an asset, choose a language, and get the evidence window before you go deeper.</p>
+      </div>
+      <div class="trybox">
+        <div class="trybox-top"><strong>Uzam research console</strong><span>Live endpoint</span></div>
         <div class="tryrow">
           <select id="sym" aria-label="Token symbol">
             <option value="AAPLx">AAPLx — Apple</option>
@@ -307,16 +423,11 @@
             <option value="Vx">Vx — Visa</option>
             <option value="PLTRx">PLTRx — Palantir</option>
           </select>
-          <select id="lang" aria-label="Response language">
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-          </select>
+          <select id="lang" aria-label="Response language"><option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option></select>
         </div>
         <div class="tryrow">
-          <button class="btn btn-sm" id="btnId" type="button">Identify — instant</button>
-          <button class="btn btn-sm btn-primary" id="btnGo" type="button">Full report — ~20s</button>
+          <button class="button secondary" id="btnId" type="button">Identify — instant</button>
+          <button class="button" id="btnGo" type="button">Full report — ~20s</button>
         </div>
         <p id="tryStatus" role="status"></p>
         <pre id="tryOut">Your answer appears here.</pre>
@@ -324,163 +435,81 @@
     </div>
   </section>
 
-  <!-- ── PRICING ── -->
-  <section class="band" id="pricing">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">Pricing · pay per call</p>
-        <h2>Free to meet. Paid to dig.</h2>
-        <p>Discovery and agent access stay open. Depth is settled per call in USDT0 on X Layer via x402 — no signup, no API key, the HTTP 402 is the invoice.</p>
-      </div>
-      <div class="cards">
-        <div class="card frame slab">
-          <span class="tag">Agents</span>
-          <h3>MCP access</h3>
-          <p class="price">$0.00<small> / always</small></p>
-          <p>All 5 tools in Claude, Cursor, OpenCode. The demo window — point your agent at one URL and ask.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Identify</h3>
-          <p class="price">$0.15<small> / call</small></p>
-          <p>Issuer, underlying, chain, official docs. Never guesses — unknown symbols return the supported list.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Preview</h3>
-          <p class="price">$0.15<small> / call</small></p>
-          <p>Capped identity-only report. Zero external fetches — the cheapest way to check coverage.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Full report</h3>
-          <p class="price">$0.25<small> / call</small></p>
-          <ul>
-            <li>Backing quotes + premium math</li>
-            <li>Holders, pools, 30-day range</li>
-            <li>9 risks, SEC filings, unknowns</li>
-          </ul>
-        </div>
-        <div class="card frame slab">
-          <h3>Compare ×4</h3>
-          <p class="price">$0.50<small> / call</small></p>
-          <p>Up to 4 assets side by side with per-category leaders, premium deltas and shared-whale flags.</p>
+  <section class="section" id="api">
+    <div class="container architecture">
+      <div><p class="eyebrow">Capital, data, and code in unity</p><h2>Built for agents first.</h2></div>
+      <div>
+        <p class="architecture-copy">Free discovery, paid depth, and explicit uncertainty. Uzam turns complex asset research into a durable interface for the systems that need to use it. <code>402 Payment Required</code> is the invoice; the answer stays machine-readable.</p>
+        <div class="architecture-cards">
+          <article class="architecture-card"><span class="card-index">01 / FREE DISCOVERY</span><h3>MCP access</h3><p>Connect Claude, Cursor, or OpenCode to one URL and ask about a supported token.</p></article>
+          <article class="architecture-card"><span class="card-index">02 / PAY PER CALL</span><h3>x402 depth</h3><p>Settle full research in USDT0 on X Layer without signup, API keys, or a billing dashboard.</p></article>
+          <article class="architecture-card"><span class="card-index">03 / MACHINE OUTPUT</span><h3>Evidence you can cite</h3><p>Every report carries sources, timestamps, confidence, missing data, and a clear boundary around what Uzam cannot prove.</p></article>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── API ── -->
-  <section class="band" id="api">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">API · REST + x402</p>
-        <h2>Built for agents first.</h2>
-        <p>Free discovery, paid depth. Unpaid calls to paid routes return <code>402 Payment Required</code> — the invoice is in the header. Machine-readable contract at <code>/.well-known/x402</code>.</p>
+  <section class="section" id="pricing">
+    <div class="container">
+      <div class="pricing-head"><h2>Free to meet.<br />Paid to dig.</h2><p>Discovery stays open. Depth is settled per call in USDT0 on X Layer via x402 — no signup, no wallet flow in the browser.</p></div>
+      <div class="price-grid">
+        <article class="price-card"><h3>MCP access</h3><div class="price">$0.00 <small>/ always</small></div><p>All five tools for agents.</p></article>
+        <article class="price-card"><h3>Identify</h3><div class="price">$0.15 <small>/ call</small></div><p>Issuer, underlying, chain, and official docs.</p></article>
+        <article class="price-card"><h3>Preview</h3><div class="price">$0.15 <small>/ call</small></div><p>Identity-only coverage check.</p></article>
+        <article class="price-card"><h3>Full report</h3><div class="price">$0.25 <small>/ call</small></div><p>Backing, premium, holders, risks, filings.</p></article>
+        <article class="price-card"><h3>Compare ×4</h3><div class="price">$0.50 <small>/ call</small></div><p>Four assets side by side.</p></article>
       </div>
-      <div class="stack">
-        <div>
-          <p class="step-label">Free discovery — identify (MCP, no payment)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-production-95f9.up.railway.app/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
-       "params":{"name":"identify_asset",
-       "arguments":{"symbol":"AAPLx","lang":"en"}}}'</pre><button class="copy" type="button">Copy</button></div>
-        </div>
-        <div>
-          <p class="step-label">Paid depth — full report ($0.25 via x402)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-production-95f9.up.railway.app/api/research \
-  -H "Content-Type: application/json" \
-  -d '{"symbol":"NVDAx","focus":"full","lang":"zh"}'
-# → 402 + PAYMENT-REQUIRED on first call; pay 0.25 USDT0 on X Layer, replay with the signature, get the dossier.</pre><button class="copy" type="button">Copy</button></div>
-        </div>
-        <div>
-          <p class="step-label">Agent install snippet</p>
-          <div class="code"><pre class="codeblock">{
-  "mcpServers": {
-    "uzam": { "url": "https://uzam-production-95f9.up.railway.app/mcp" }
-  }
-}
-# Then ask: "Use Uzam to compare AAPLx vs TSLAx backing and biggest unanswered risks."</pre><button class="copy" type="button">Copy</button></div>
-        </div>
+      <div class="trust-grid" id="trust">
+        <article class="trust-card"><h3>Never invents</h3><p>Unknown symbols return the supported list. Missing data returns <code>missing[]</code>, never a plausible fake.</p></article>
+        <article class="trust-card"><h3>Claim vs fact</h3><p>Issuer statements are labeled CLAIM until independently verified. Strong confidence needs multiple sources.</p></article>
+        <article class="trust-card"><h3>Unknowns stated</h3><p>Every report ends with what could not be proven and what would change the conclusion.</p></article>
+        <article class="trust-card"><h3>Never “safe”</h3><p>Nine fixed risk categories, ranked high to low. Only observed severity, never a promise.</p></article>
       </div>
     </div>
   </section>
 
-  <!-- ── GUARDRAILS ── -->
-  <section class="band" id="trust">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">Trust · guardrails, not vibes</p>
-        <h2>What Uzam refuses to do.</h2>
-        <p>The rules are in code, not in prompts — so they hold no matter which agent calls.</p>
-      </div>
-      <div class="cards">
-        <div class="card frame slab">
-          <h3>Never invents</h3>
-          <p>Unknown symbols return the supported list. Missing data returns <code>missing[]</code>, never a plausible fake. No contract is ever hardcoded.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Claim vs fact</h3>
-          <p>Issuer statements are labeled CLAIM until independently verified. Grades cap at MEDIUM on issuer word alone — HIGH needs multiple sources plus tokenlist confirmation.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Unknowns stated</h3>
-          <p>Every report ends with what couldn't be proven and what would change the conclusion. "Custodian UNKNOWN" beats a confident lie.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Never "safe"</h3>
-          <p>Nine fixed risk categories, ranked high → low. The word "safe" appears nowhere in the codebase — only observed severity.</p>
-        </div>
+  <section class="section insights" id="insights">
+    <div class="container insights-layout">
+      <div class="insights-title"><p class="eyebrow">News + insights</p><h2>Signals worth following.</h2><a class="button secondary" href="https://github.com/zachbuilds26/uzam">View source ↗</a></div>
+      <div class="article-list">
+        <a class="article" href="#try"><span class="article-index">01</span><div><h3>The evidence window for tokenized stocks</h3><p>How Uzam separates backing claims, observed market data, and unanswered questions.</p></div><span class="arrow">↗</span></a>
+        <a class="article" href="#api"><span class="article-index">02</span><div><h3>What agents need from onchain research</h3><p>Structured outputs, source boundaries, and why “unknown” is a useful result.</p></div><span class="arrow">↗</span></a>
+        <a class="article" href="#trust"><span class="article-index">03</span><div><h3>Risk is a feature of the interface</h3><p>Nine categories, explicit missing data, and the discipline behind an evidence-backed dossier.</p></div><span class="arrow">↗</span></a>
       </div>
     </div>
   </section>
-
 </main>
 
-<footer>
-  <div class="foot">
-    <span><a href="https://www.okx.ai/agents/13653">ASP #13653 on OKX.AI</a> · <a href="https://github.com/zachbuilds26/uzam">source</a> · <a href="/health">health</a> · <a href="/openapi.json">openapi</a></span>
-    <span>Settled on X Layer (196) · USDT0 via x402</span>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-layout">
+      <div class="footer-groups">
+        <div class="footer-group"><h3>Explore</h3><a href="#about">About Uzam</a><a href="#strategies">Capabilities</a><a href="#pricing">Pricing</a><a href="#try">Try live</a></div>
+        <div class="footer-group"><h3>Develop</h3><a href="#api">MCP + REST</a><a href="https://www.okx.ai/agents/13653">OKX.AI</a><a href="/health">Live health</a><a href="/openapi.json">OpenAPI</a></div>
+        <div class="footer-group"><h3>Source</h3><a href="https://github.com/zachbuilds26/uzam">GitHub</a><a href="https://xlayer.tech/">X Layer</a><a href="mailto:hello@uzam.ai">Contact</a></div>
+      </div>
+      <div class="newsletter"><h2>Stay close to the signal.</h2><p>Research notes, product updates, and new asset coverage from the Uzam team.</p><form class="subscribe" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';"><input type="email" placeholder="Your email" aria-label="Your email" required /><button class="button" type="submit">Subscribe</button></form></div>
+    </div>
+    <div class="footer-bottom">
+      <a class="wordmark" href="#top" aria-label="Uzam home"><svg class="hex" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="currentColor"/></svg><span>UZAM</span></a>
+      <span>© 2026 Uzam · Research only, not financial advice.</span>
+    </div>
+    <p class="disclaimer">Tokenized equities carry issuer, custody, redemption, and regulatory risk, including total loss. Uzam provides evidenced analysis of listed instruments; it does not execute trades or custody funds.</p>
   </div>
-  <p class="disclaimer">Research only, not financial advice. Tokenized equities carry issuer, custody, redemption and regulatory risk, including total loss. Uzam provides evidenced analysis of listed instruments; it does not execute trades or custody funds.</p>
 </footer>
 
 <script>
-/* Splash, setup tabs, copy buttons, and the live try-widget. */
+/* Copy buttons are intentionally kept small and local; the live widget still calls the production MCP endpoint. */
 (function () {
-  var splash = document.getElementById('splash');
-  if (!splash) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    splash.remove();
-    return;
+  var header = document.querySelector('.site-header');
+  var menu = document.querySelector('.menu-toggle');
+  if (header && menu) {
+    menu.addEventListener('click', function () {
+      var open = header.classList.toggle('menu-open');
+      menu.setAttribute('aria-expanded', String(open));
+      menu.textContent = open ? '×' : '☰';
+    });
   }
-  requestAnimationFrame(function () { splash.classList.add('typing'); });
-  setTimeout(function () { splash.classList.add('done'); }, 1400);
-  setTimeout(function () { splash.remove(); }, 1800);
-})();
-
-document.addEventListener('click', function (ev) {
-  var btn = ev.target.closest ? ev.target.closest('.copy') : null;
-  if (!btn) return;
-  var pre = btn.parentElement.querySelector('pre');
-  if (!pre) return;
-  var done = function (label) {
-    btn.textContent = label;
-    setTimeout(function () { btn.textContent = 'Copy'; }, 2200);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(pre.textContent).then(function () { done('Copied'); }, function () { done('Press Ctrl+C'); });
-  } else {
-    var r = document.createRange();
-    r.selectNodeContents(pre);
-    var sel = getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
-    done('Press Ctrl+C');
-  }
-});
-
-/* ── Try widget: free MCP calls from the browser ── */
-(function () {
   var sym = document.getElementById('sym');
   var lang = document.getElementById('lang');
   var out = document.getElementById('tryOut');
@@ -492,10 +521,8 @@ document.addEventListener('click', function (ev) {
   function setBusy(busy, label) {
     btnId.disabled = busy;
     btnGo.disabled = busy;
-    status.className = busy ? '' : status.className;
     if (busy) status.textContent = label;
   }
-
   function mcpCall(tool, args) {
     return fetch('/mcp', {
       method: 'POST',
@@ -505,8 +532,8 @@ document.addEventListener('click', function (ev) {
       if (!res.ok) throw new Error('HTTP ' + res.status + ' — host may be waking, retry shortly.');
       return res.text();
     }).then(function (text) {
-      var lines = text.split('\n').filter(function (l) { return l.indexOf('data: ') === 0; });
-      if (lines.length === 0) throw new Error('No MCP data in response (host may be waking — try again).');
+      var lines = text.split('\n').filter(function (line) { return line.indexOf('data: ') === 0; });
+      if (!lines.length) throw new Error('No MCP data in response — try again.');
       var msg = JSON.parse(lines[lines.length - 1].slice(6));
       if (msg.error) throw new Error(msg.error.message || 'MCP error');
       var content = (msg.result && msg.result.content && msg.result.content[0]) || {};
@@ -514,68 +541,33 @@ document.addEventListener('click', function (ev) {
       return JSON.parse(content.text || '{}');
     });
   }
-
-  function cleanSymbol() {
-    return sym.value;
-  }
-
-  // Machine reason codes → human words. The JSON keeps the codes; humans read this.
-  function liveHuman(reason) {
-    var r = String(reason || '');
-    if (/contract_on_xlayer|token_search|timeout_12s|network error|fetch failed/i.test(r)) return 'market unreachable right now — retry shortly';
-    if (/okx_credentials/i.test(r)) return 'market data not configured';
-    return r || 'unknown';
-  }
-
   function renderIdentify(d) {
     if (!d.found) return 'Not in registry. Supported: ' + (d.supported_symbols || []).join(', ') + '\n' + (d.uncertainty || '');
-    var L = [];
-    L.push(d.symbol + ' — ' + d.name);
-    L.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
-    L.push('Underlying: ' + (d.underlying_asset || ''));
-    if (d.underlying && d.underlying.ticker) L.push('  Ticker ' + d.underlying.ticker + ' · ' + (d.underlying.exchange || '') + (d.underlying.sec_filings ? ' · Filings: ' + d.underlying.sec_filings : ''));
-    L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')' + (d.chain_info && d.chain_info.explorer ? ' — ' + d.chain_info.explorer : ''));
-    if (d.live && d.live.available) L.push('Live: $' + d.live.price + ' (' + (d.live.data_timestamp || '').slice(0, 16).replace('T', ' ') + ' UTC)');
-    else if (d.live) L.push('Live price unavailable — ' + liveHuman(d.live.reason));
-    if (d.product_page) L.push('Product page: ' + d.product_page);
-    if (d.issuer_published_contract) L.push('Issuer-published contract: ' + d.issuer_published_contract + (d.issuer_contract_explorer ? ' — ' + d.issuer_contract_explorer : ''));
-    L.push('Official docs:');
-    (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
-    return L.join('\n');
+    var lines = [];
+    lines.push(d.symbol + ' — ' + d.name);
+    lines.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
+    lines.push('Underlying: ' + (d.underlying_asset || ''));
+    if (d.underlying && d.underlying.ticker) lines.push('  Ticker ' + d.underlying.ticker + ' · ' + (d.underlying.exchange || ''));
+    lines.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')');
+    if (d.live && d.live.available) lines.push('Live: $' + d.live.price);
+    else if (d.live) lines.push('Live price unavailable — ' + (d.live.reason || 'unknown'));
+    lines.push('Official docs:');
+    (d.official_documents || []).forEach(function (url) { lines.push('  - ' + url); });
+    return lines.join('\n');
   }
-
   btnId.addEventListener('click', function () {
-    var s;
-    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
-    setBusy(true, 'Asking Uzam…');
-    out.textContent = '…';
-    mcpCall('identify_asset', { symbol: s, lang: lang.value }).then(function (d) {
-      out.textContent = renderIdentify(d);
-      status.textContent = 'Free via MCP · ' + new Date().toISOString();
-      status.className = '';
-    }).catch(function (e) {
-      out.textContent = 'Failed: ' + e.message;
-      status.textContent = 'Error — retry, or check /health.';
-      status.className = 'err';
-    }).then(function () { setBusy(false); });
+    setBusy(true, 'Asking Uzam…'); out.textContent = '…';
+    mcpCall('identify_asset', { symbol: sym.value, lang: lang.value }).then(function (data) {
+      out.textContent = renderIdentify(data); status.textContent = 'Free via MCP · live response.';
+    }).catch(function (error) { out.textContent = 'Failed: ' + error.message; status.textContent = 'Error — retry, or check /health.'; status.className = 'err'; }).then(function () { setBusy(false); });
   });
-
   btnGo.addEventListener('click', function () {
-    var s;
-    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
-    setBusy(true, 'Full research runs ~20s (OKX + issuer pages + SEC + news)…');
-    out.textContent = 'Gathering evidence…';
-    mcpCall('research_asset', { symbol: s, focus: 'full', lang: lang.value }).then(function (d) {
-      out.textContent = d.summary || JSON.stringify(d, null, 2).slice(0, 6000);
-      status.textContent = 'Free via MCP · full dossier above.';
-      status.className = '';
-    }).catch(function (e) {
-      out.textContent = 'Failed: ' + e.message;
-      status.textContent = 'Error — retry, or check /health.';
-      status.className = 'err';
-    }).then(function () { setBusy(false); });
+    setBusy(true, 'Full research runs ~20s…'); out.textContent = 'Gathering evidence…';
+    mcpCall('research_asset', { symbol: sym.value, focus: 'full', lang: lang.value }).then(function (data) {
+      out.textContent = data.summary || JSON.stringify(data, null, 2).slice(0, 6000); status.textContent = 'Free via MCP · full dossier above.';
+    }).catch(function (error) { out.textContent = 'Failed: ' + error.message; status.textContent = 'Error — retry, or check /health.'; status.className = 'err'; }).then(function () { setBusy(false); });
   });
-})();
+}());
 </script>
 </body>
 </html>
