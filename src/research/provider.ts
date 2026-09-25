@@ -21,17 +21,96 @@ export type FetchedDoc = {
 
 // Defense in depth: Uzam only ever fetches registry/news URLs, but enforce it
 // here too — https only, no loopback/private/link-local targets.
+// Hostnames that parse as IP literals are rejected outright (registry and
+// news hosts are DNS names); this kills decimal/hex/octal 127.0.0.1 disguises.
+// Redirects are followed manually (max 3) with re-validation per hop.
+import { isIP } from "node:net";
+
 function urlAllowed(url: string): boolean {
   try {
     const u = new URL(url);
     if (u.protocol !== "https:") return false;
-    const h = u.hostname.toLowerCase();
-    if (h === "localhost" || h.endsWith(".localhost") || h === "[::1]" || h === "::1") return false;
-    if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return false;
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (isIP(h)) return false;
+    if (h === "localhost" || h.endsWith(".localhost")) return false;
+    if (/^(127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return false;
+    if (/^(::|fc|fd|fe80|fe90|fea|feb|fec|fed|fee|fef)/i.test(h.replace(/:/g, ""))) return false;
     return true;
   } catch {
     return false;
   }
+}
+
+// Strip ASCII control characters (NUL etc.) — attacker text must never
+// smuggle control bytes into agent-facing excerpts.
+function stripControls(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+
+// Bounded fetch: manual redirect chain (re-validated per hop) + hard body cap
+// enforced DURING the read (content-length may lie or be absent on chunked).
+async function guardedFetch(
+  url: string,
+  timeoutMs: number,
+  maxBytes: number,
+  headers?: Record<string, string>
+): Promise<{ res: Response; url: string } | { error: string }> {
+  let current = url;
+  for (let hop = 0; hop <= 3; hop++) {
+    if (!urlAllowed(current)) return { error: `URL blocked (hop ${hop}): ${current.slice(0, 120)}` };
+    let res: Response;
+    try {
+      res = await fetch(current, {
+        headers: { "User-Agent": "uzam-mvp/0.1 (+research)", ...(headers ?? {}) },
+        signal: AbortSignal.timeout(timeoutMs),
+        redirect: "manual",
+      });
+    } catch (e) {
+      return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      await res.body?.cancel().catch(() => undefined);
+      if (!loc) return { error: `redirect without location (HTTP ${res.status})` };
+      try {
+        current = new URL(loc, current).toString();
+      } catch {
+        return { error: "unparseable redirect location" };
+      }
+      continue;
+    }
+    // Drain with a cap: reader enforces maxBytes regardless of headers.
+    try {
+      const reader = res.body?.getReader();
+      if (!reader) return { error: "empty response body" };
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => undefined);
+          return { error: `body exceeds ${maxBytes} bytes` };
+        }
+        chunks.push(value);
+      }
+      const merged = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) {
+        merged.set(c, off);
+        off += c.byteLength;
+      }
+      return {
+        res: new Response(merged, { status: res.status, headers: res.headers }),
+        url: current,
+      };
+    } catch (e) {
+      return { error: `body read failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
+  return { error: "too many redirects (max 3)" };
 }
 
 function decodeEntities(s: string): string {
@@ -56,27 +135,24 @@ function decodeEntities(s: string): string {
 function stripHtml(html: string): { title: string | null; text: string } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1]).replace(/\s+/g, " ").trim().slice(0, 200) : null;
+  // Unclosed script/style/template blocks: cut from the open tag to end of
+  // input (a truncated page must not leak raw JS into evidence text).
   let text = html
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<(noscript|template)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<script[\s\S]*?(<\/script>|$)/gi, " ")
+    .replace(/<style[\s\S]*?(<\/style>|$)/gi, " ")
+    .replace(/<(noscript|template)[\s\S]*?(<\/\1>|$)/gi, " ")
     .replace(/<[^>]+>/g, " ");
-  text = decodeEntities(text).replace(/\s+/g, " ").trim();
+  text = stripControls(decodeEntities(text)).replace(/\s+/g, " ").trim();
   return { title, text };
 }
 
 export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000): Promise<FetchedDoc> {
   if (!urlAllowed(url)) return { url, ok: false, status: 0, title: null, text: null, error: "URL blocked (https + public hosts only)" };
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { "User-Agent": "uzam-mvp/0.1 (+research)" },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (e) {
-    return { url, ok: false, status: 0, title: null, text: null, error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` };
-  }
+  // 8 MB transport cap; HTML text is re-checked below (2 MB), PDFs in fetchPdf.
+  const out = await guardedFetch(url, timeoutMs, 8_000_000);
+  if ("error" in out) return { url, ok: false, status: 0, title: null, text: null, error: out.error };
+  const { res } = out;
   if (!res.ok) return { url, ok: false, status: res.status, title: null, text: null, error: `HTTP ${res.status}` };
   const contentType = res.headers.get("content-type") ?? "";
   const isPdf = contentType.includes("application/pdf") || /\.pdf(\?|#|$)/i.test(url);
@@ -94,6 +170,11 @@ export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000
   } catch (e) {
     return { url, ok: false, status: res.status, title: null, text: null, error: `page body unreadable: ${e instanceof Error ? e.message : String(e)}` };
   }
+  // Transport cap is 8 MB (shared with PDFs); HTML text re-checked here
+  // because content-length may lie or be absent on chunked responses.
+  if (html.length > 2_000_000) {
+    return { url, ok: false, status: res.status, title: null, text: null, error: `page too large (${html.length} chars)` };
+  }
   const { title, text } = stripHtml(html);
   if (text.length <= maxChars) return { url, ok: true, status: res.status, title, text, truncated: false };
   const cut = text.lastIndexOf(". ", maxChars);
@@ -106,9 +187,13 @@ export async function fetchPage(url: string, timeoutMs = 15000, maxChars = 20000
 // Image-only (scanned) PDFs yield nothing — reported honestly, never faked.
 function pdfStreamText(raw: Buffer): string {
   const parts: string[] = [];
+  let totalLen = 0;
   const push = (s: string): void => {
-    const clean = s.replace(/\s+/g, " ").trim();
-    if (clean.length > 2) parts.push(clean);
+    const clean = stripControls(s.replace(/\s+/g, " ").trim());
+    if (clean.length > 2) {
+      parts.push(clean);
+      totalLen += clean.length;
+    }
   };
   const scanText = (chunk: string): void => {
     // Literal strings: ( ... ) with \( \) \\ escapes. Skip font-encoding junk.
@@ -135,17 +220,20 @@ function pdfStreamText(raw: Buffer): string {
   if (streams.length === 0) {
     scanText(bin);
   } else {
+    // Bomb guards: skip fat streams, cap inflated output and stream count.
+    let n = 0;
     for (const s of streams) {
+      if (++n > 50 || totalLen > 300000) break;
       const bytes = Buffer.from(s[1], "latin1");
+      if (bytes.length > 1_000_000) continue;
       try {
-        scanText(inflateSync(bytes).toString("latin1"));
+        scanText(inflateSync(bytes, { maxOutputLength: 1_000_000 }).toString("latin1"));
       } catch {
-        scanText(s[1]); // uncompressed stream — scan raw
+        if (bytes.length <= 500_000) scanText(s[1].slice(0, 500_000)); // uncompressed stream — scan raw
       }
-      if (parts.join(" ").length > 60000) break;
     }
   }
-  return parts.join(" ").replace(/\s+/g, " ").trim();
+  return stripControls(parts.join(" ").replace(/\s+/g, " ").trim());
 }
 
 async function fetchPdf(url: string, res: Response, maxChars: number): Promise<FetchedDoc> {
@@ -266,15 +354,9 @@ export type NewsItem = {
 export async function fetchNews(query: string, maxItems = 5, timeoutMs = 15000): Promise<{ items: NewsItem[]; error?: string }> {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   if (!urlAllowed(url)) return { items: [], error: "news URL blocked" };
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { "User-Agent": "uzam-mvp/0.1 (+research)", "Accept": "application/rss+xml" },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (e) {
-    return { items: [], error: `news fetch failed: ${e instanceof Error ? e.message : String(e)}` };
-  }
+  const out = await guardedFetch(url, timeoutMs, 1_000_000, { Accept: "application/rss+xml" });
+  if ("error" in out) return { items: [], error: `news fetch failed: ${out.error}` };
+  const { res } = out;
   if (!res.ok) return { items: [], error: `news HTTP ${res.status}` };
   let xml: string;
   try {
@@ -286,15 +368,16 @@ export async function fetchNews(query: string, maxItems = 5, timeoutMs = 15000):
   const items: NewsItem[] = [];
   for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)) {
     const body = m[1];
-    if (!body) continue;
+    if (!body || body.length > 20000) continue;
     const pick = (tag: string, cap: number): string | null => {
       const r = body.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}\\s*>`, "i"));
       if (!r || !r[1]) return null;
-      return decodeEntities(r[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")).trim().slice(0, cap) || null;
+      return stripControls(decodeEntities(r[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1"))).trim().slice(0, cap) || null;
     };
     const title = pick("title", 300);
     const link = pick("link", 2000);
-    if (!title || !link) continue;
+    // Links become clickable evidence — https public hosts only.
+    if (!title || !link || !urlAllowed(link)) continue;
     items.push({ title, url: link, source: pick("source", 120), published_at: pick("pubDate", 120) });
     if (items.length >= maxItems) break;
   }

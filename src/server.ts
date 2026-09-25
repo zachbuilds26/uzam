@@ -9,8 +9,8 @@ import * as z from "zod/v4";
 import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
-import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios, fetchLiveQuote } from "./research/engines.js";
-import { normalizeLang, t } from "./research/i18n.js";
+import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios, fetchLiveQuote, toNum } from "./research/engines.js";
+import { normalizeLang, t, langFallbackNote } from "./research/i18n.js";
 import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
 
 // Landing page (same-origin try-widget calls /mcp). Read once at boot;
@@ -23,12 +23,14 @@ try {
 }
 
 // Bounded inputs: symbols are short tickers, never free text.
+// Edges must be alphanumeric so pure punctuation ("..", "---") never validates.
 // lang is REQUIRED on MCP tools so the calling agent must ask the human
 // which language they want (en/zh/es/fr) instead of assuming English.
 // Anything outside the supported list falls back to en downstream.
+const TICKER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9.\-]{0,18}[A-Za-z0-9])?$/;
 const LangReq = z.string().trim().toLowerCase().min(2).max(10).regex(/^[a-z]{2}(-[a-z]{2})?$/)
   .describe("Response language — ask the user to choose: en (English), zh (Chinese), es (Spanish), fr (French)");
-const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), lang: LangReq });
+const SymbolInput = z.object({ symbol: z.string().trim().min(1).max(20).regex(TICKER_RE), lang: LangReq });
 
 // ---- Fridge stock: static X Layer registry (no fake contracts, no guessing) ----
 type RegistryAsset = {
@@ -48,7 +50,7 @@ type RegistryAsset = {
   official_documents: string[];
 };
 
-const registry = z.object({
+const registrySchema = z.object({
   chain: z.object({ name: z.string(), chainId: z.number(), chainIndex: z.number(), rpc: z.string().optional(), explorer: z.string().optional() }),
   tokenlist: z.string(),
   tokenlist_raw: z.string().optional(),
@@ -62,7 +64,14 @@ const registry = z.object({
     product_page: z.string().optional(), issuer_published_contract: z.string().optional(),
     official_website: z.string(), official_documents: z.array(z.string()),
   })),
-}).parse(registryJson) as { chain: { name: string; chainId: number; chainIndex: number; rpc?: string; explorer?: string }; tokenlist: string; tokenlist_raw?: string; issuer_docs?: string; assets: RegistryAsset[] };
+});
+type Registry = z.infer<typeof registrySchema>;
+const parsedRegistry = registrySchema.safeParse(registryJson);
+if (!parsedRegistry.success) {
+  console.error("FATAL: src/data/xlayer-assets.json failed validation:", parsedRegistry.error.flatten());
+  process.exit(1);
+}
+const registry: Registry = parsedRegistry.data;
 
 function findAsset(symbol: unknown): RegistryAsset | undefined {
   if (typeof symbol !== "string") return undefined;
@@ -89,7 +98,8 @@ const handler = createMcpHandler(() => {
     },
     async ({ symbol, lang }) => {
       const asset = findAsset(symbol);
-      const L = (k: string): string => t(normalizeLang(lang), k);
+      const langCode = normalizeLang(lang);
+      const L = (k: string): string => t(langCode, k);
       const live = asset ? await fetchLiveQuote(asset.symbol) : null;
       if (!asset) {
         const supported = registry.assets.map((a) => a.symbol);
@@ -101,6 +111,8 @@ const handler = createMcpHandler(() => {
                 {
                   found: false,
                   symbol: symbol.trim().toUpperCase(),
+                  lang: langCode,
+                  ...(langFallbackNote(lang, langCode) ? { lang_note: langFallbackNote(lang, langCode) } : {}),
                   uncertainty: L("id_unknown"),
                   supported_symbols: supported,
                   tokenlist: registry.tokenlist,
@@ -121,6 +133,8 @@ const handler = createMcpHandler(() => {
                 found: true,
                 name: asset.name,
                 symbol: asset.symbol,
+                lang: langCode,
+                ...(langFallbackNote(lang, langCode) ? { lang_note: langFallbackNote(lang, langCode) } : {}),
                 summary: `${asset.symbol} — ${asset.name} (${asset.asset_type} · ${asset.issuer} · ${asset.underlying_asset}; ${L("id_backing_note")}). Chain ${asset.chains.join(", ")} (${asset.chainIds.join(", ")}). ${L("id_summary_of")}: ${asset.official_website}`,
                 asset_type: asset.asset_type,
                 issuer: asset.issuer,
@@ -167,7 +181,7 @@ const handler = createMcpHandler(() => {
     async ({ symbol, lang }: { symbol: string; lang?: string }) => {
       const clean = symbol.trim().toUpperCase();
       const langCode = normalizeLang(lang);
-      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : undefined;
+      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : langFallbackNote(lang, langCode) ?? undefined;
       const asset = findAsset(clean);
       const dataTimestamp = new Date().toISOString();
       if (!asset) {
@@ -274,12 +288,9 @@ const handler = createMcpHandler(() => {
           ],
         };
       }
-      if (contract && !/^0x[0-9a-fA-F]{40}$/.test(contract)) {
-        missing.push("contract_on_xlayer: search returned a non-EVM address; refusing to query further");
-        contract = null;
-      }
       // OKX docs: pass EVM addresses all-lowercase for price endpoints.
-      const lc = contract ? contract.toLowerCase() : "";
+      // (The early return above guarantees a valid 0x contract here.)
+      const lc = contract.toLowerCase();
       const item = { chainIndex: XLAYER_CHAIN_INDEX, tokenContractAddress: lc };
 
       // Step 2: basic price (Basic tier) + premium endpoints, each optional.
@@ -303,7 +314,7 @@ const handler = createMcpHandler(() => {
       if (advRes.ok && advRes.data) advanced = advRes.data as Record<string, unknown>;
       else missing.push(`advanced_info: ${advRes.error ?? "no data (Premium tier?)"}`);
 
-      if (holdRes.ok && Array.isArray(holdRes.data)) holders = holdRes.data as Record<string, unknown>[];
+      if (holdRes.ok && Array.isArray(holdRes.data)) holders = (holdRes.data as Record<string, unknown>[]).slice(0, 200);
       else missing.push(`holders: ${holdRes.error ?? "no data (Premium tier?)"}`);
 
       // Step 3: concentration math from whatever we got.
@@ -325,8 +336,9 @@ const handler = createMcpHandler(() => {
       }
       const sp = advanced?.stockProfile as { companyName?: unknown; stockCode?: unknown; exchange?: unknown } | undefined;
       if (sp) {
+        const cap = (v: unknown, n: number): string => String(v ?? "").slice(0, n);
         observations.push(
-          `OKX reports underlying stock profile: ${sp.companyName ?? ""} (${sp.stockCode ?? ""}, ${sp.exchange ?? ""}). Cross-check against issuer docs — this is exchange data, not issuer verification.`
+          `OKX reports underlying stock profile: ${cap(sp.companyName, 200)} (${cap(sp.stockCode, 20)}, ${cap(sp.exchange, 40)}). Cross-check against issuer docs — this is exchange data, not issuer verification.`
         );
       }
       if (missing.length > 0) {
@@ -349,7 +361,7 @@ const handler = createMcpHandler(() => {
                 contracts: [contract],
                 explorer: typeof hit?.explorerUrl === "string" && hit.explorerUrl.startsWith("https://") ? hit.explorerUrl : `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
                 supply: info?.circSupply != null && info.circSupply !== "" ? { circulating: info.circSupply } : null,
-                holders_count: (() => { const n = Number(info?.holders ?? hit?.holders); return Number.isFinite(n) ? n : null; })(),
+                holders_count: toNum(info?.holders ?? hit?.holders),
                 holder_concentration: {
                   top10HoldPercent: advanced?.top10HoldPercent ?? null,
                   top3Percent: top.length > 0 ? Number(top3Percent.toFixed(2)) : null,
@@ -401,7 +413,7 @@ const handler = createMcpHandler(() => {
     async ({ symbol, lang }: { symbol: string; lang?: string }) => {
       const clean = symbol.trim().toUpperCase();
       const langCode = normalizeLang(lang);
-      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : undefined;
+      const langNote = langCode !== "en" ? t(langCode, "detail_only_en") : langFallbackNote(lang, langCode) ?? undefined;
       const asset = findAsset(clean);
       const dataTimestamp = new Date().toISOString();
       if (!asset) {
@@ -429,17 +441,20 @@ const handler = createMcpHandler(() => {
       }
 
       // Fridge step: read the official pages live, keep backing passages.
+      // Parallel (matches engines.gatherBacking) + evidence capped at 10.
       const urls = [asset.official_website, ...asset.official_documents].filter(
         (u, i, arr) => u.startsWith("http") && arr.indexOf(u) === i
       );
       const evidence: { claim: string; source_title: string | null; source_url: string; excerpt: string; basis: string; source_type: string; tier: number; confidence: string; retrieved_at: string }[] = [];
       const fetched: string[] = [];
       const failed: string[] = [];
-      for (const url of urls.slice(0, 4)) {
-        const doc = await fetchPage(url);
+      const docs = await Promise.all(urls.slice(0, 4).map((u) => fetchPage(u)));
+      for (const doc of docs) {
+        const url = doc.url;
         if (doc.ok && doc.text) {
           fetched.push(url);
           for (const p of extractPassages(doc.text, BACKING_KEYWORDS)) {
+            if (evidence.length >= 10) break;
             evidence.push({
               claim: "Issuer describes backing/custody/redemption on its official site.",
               source_title: doc.title,
@@ -511,13 +526,14 @@ const handler = createMcpHandler(() => {
     {
       description:
         "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Ask the user for lang (en, zh, es, fr) � required (headers/labels translated, quotes stay in original language). Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
-      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq }),
+      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(TICKER_RE), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq }),
     },
     async ({ symbol, focus, lang }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string }) => {
       try {
         return { content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full", { lang }), null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `research failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true as const };
+        console.error("research_asset failed:", e instanceof Error ? e.message : String(e));
+        return { content: [{ type: "text", text: "Research failed with an internal error. Retry — if it persists, try focus issuer or backing." }], isError: true as const };
       }
     }
   );
@@ -527,13 +543,14 @@ const handler = createMcpHandler(() => {
     {
       description:
         "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Ask the user for lang (en, zh, es, fr) � required (headers/labels translated, quotes stay in original language). Returns a structured table plus per-category leaders with reasons — never a bald recommendation.",
-      inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-]{1,20}$/)).min(1).max(4), lang: LangReq }),
+      inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(TICKER_RE)).min(1).max(4), lang: LangReq }),
     },
     async ({ symbols, lang }: { symbols: string[]; lang?: string }) => {
       try {
         return { content: [{ type: "text", text: JSON.stringify(await compareAssets(symbols, { lang }), null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `compare failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true as const };
+        console.error("compare_assets failed:", e instanceof Error ? e.message : String(e));
+        return { content: [{ type: "text", text: "Comparison failed with an internal error. Retry with fewer symbols." }], isError: true as const };
       }
     }
   );
@@ -548,14 +565,15 @@ const rawHosts = (process.env.ALLOWED_HOSTS ?? "")
   .filter((h) => /^[a-z0-9.-]+$/.test(h));
 
 if (process.env.NODE_ENV === "production" && rawHosts.length === 0) {
-  throw new Error("ALLOWED_HOSTS must be set in production (e.g. uzam.onrender.com)");
+  throw new Error("ALLOWED_HOSTS must be set in production (e.g. uzam-m3pi.onrender.com)");
 }
 
 const app = rawHosts.length > 0
-  ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: rawHosts })
-  : createMcpExpressApp();
-// Behind Render's proxy: trust X-Forwarded-Proto so generated URLs use https.
-app.set("trust proxy", true);
+  ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: rawHosts, jsonLimit: "1mb" })
+  : createMcpExpressApp({ jsonLimit: "1mb" });
+// Behind Render's proxy: trust the first hop only for scheme/IP.
+// Host validation reads the raw Host header (immune to X-Forwarded-Host).
+app.set("trust proxy", 1);
 const nodeHandler = toNodeHandler(handler);
 
 app.all("/mcp", (req: Request, res: Response) => {
@@ -609,11 +627,20 @@ app.get("/info", (_req: Request, res: Response) => {
 });
 
 // JSON error for anything the route handlers didn't catch (e.g. paywall init).
-// Registered last so it covers every route above.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
-  console.error("Unhandled route error:", err);
-  if (!res.headersSent) res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+// Registered last so it covers every route above. /mcp body-parser failures
+// (malformed JSON, oversized payload) stay JSON-RPC shaped for MCP clients;
+// everything else gets a generic 500 with the real status preserved.
+app.use((err: unknown, req: Request, res: Response, _next: () => void) => {
+  console.error("Unhandled route error:", err instanceof Error ? err.message : String(err));
+  if (res.headersSent) return;
+  if (req.path === "/mcp") {
+    const body = req.body as { id?: unknown } | undefined;
+    const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 400;
+    res.status(status).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32700, message: "Parse error" } });
+    return;
+  }
+  const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 500;
+  res.status(status).json({ ok: false, error: "internal_error" });
 });
 
 const rawPort = Number(process.env.PORT ?? 3000);
@@ -625,6 +652,18 @@ srv.on("error", (e) => {
   console.error("listen failed:", e);
   process.exit(1);
 });
+// Graceful shutdown: Render sends SIGTERM on every redeploy; in-flight
+// ~20s reports get up to 10s to finish before force-exit.
+let shuttingDown = false;
+for (const sig of ["SIGTERM", "SIGINT"] as const) {
+  process.on(sig, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`received ${sig} — draining...`);
+    srv.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 10000).unref();
+  });
+}
 }
 
 void main();

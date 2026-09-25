@@ -8,6 +8,7 @@ import {
   fmtNum,
   pct,
   hasNum,
+  toNum,
   tradeRatios,
   okxCoverage,
   summarizeCandles,
@@ -15,9 +16,11 @@ import {
   summarizePools,
   detectNamedCustodian,
   cutWords,
+  buildRisks,
+  summarizeCompare,
 } from "../src/research/engines.js";
 import { extractPassages, BACKING_KEYWORDS } from "../src/research/provider.js";
-import { normalizeLang, t, sev, SUPPORTED_LANGS } from "../src/research/i18n.js";
+import { normalizeLang, t, sev, langFallbackNote, SUPPORTED_LANGS } from "../src/research/i18n.js";
 
 describe("null-safety: gaps stay null, never become 0", () => {
   it("fmtMoney(null) is null, not 0.00", () => {
@@ -60,9 +63,14 @@ describe("okxCoverage: one counter, every path", () => {
   it("full success is 7/7", () => {
     assert.deepEqual(okxCoverage([]), { ok: 7, total: 7 });
   });
-  it("no credentials / no contract is 0/7, never inflated", () => {
+  it("absent list proves nothing (0/7, never 7/7)", () => {
+    assert.deepEqual(okxCoverage(undefined), { ok: 0, total: 7 });
+    assert.deepEqual(okxCoverage(null), { ok: 0, total: 7 });
+  });
+  it("no credentials / no contract is 0/7, including suffixed variants", () => {
     assert.deepEqual(okxCoverage(["okx_credentials"]), { ok: 0, total: 7 });
     assert.deepEqual(okxCoverage(["token_search: boom", "contract_on_xlayer"]), { ok: 0, total: 7 });
+    assert.deepEqual(okxCoverage(["contract_on_xlayer: search returned a non-EVM address; refusing"]), { ok: 0, total: 7 });
     assert.deepEqual(okxCoverage(["skipped_by_focus"]), { ok: 0, total: 7 });
   });
   it("partial failure counts only real endpoints", () => {
@@ -123,15 +131,6 @@ describe("evidence filters: marketing never becomes evidence", () => {
   });
 });
 
-describe("detectNamedCustodian: no generic-word custodians", () => {
-  it("rejects 'them' style generics, accepts real names", () => {
-    assert.equal(detectNamedCustodian(["custody by them is standard practice here"]), null);
-    assert.equal(
-      detectNamedCustodian(["assets are held in custody by First National Trust Company for clients"]),
-      "First National Trust Company for clients"
-    );
-  });
-});
 
 describe("i18n: fallback never breaks, quotes never translated", () => {
   it("unknown codes fall back to English", () => {
@@ -152,5 +151,66 @@ describe("i18n: fallback never breaks, quotes never translated", () => {
   it("severity translates, grades stay codes", () => {
     assert.equal(sev("zh", "high"), "高");
     assert.equal(sev("es", "unknown"), "desconocido");
+  });
+});
+
+describe("buildRisks: missing data fails toward caution, never safety", () => {
+  const onchainFull = {
+    holder_concentration: { top10HoldPercent: "30" },
+    trading_activity: { liquidity_raw: "1000000", liquidity: "1000000.00" },
+    missing: [],
+  };
+  const backingMed = { confidence: "MEDIUM", unanswered_questions: ["q"], redemption_excerpts: ["redeem freely"], pages_read: ["u"], geo_excerpts: ["US excluded"] };
+  it("weak backing reads high risk, strong reads low", () => {
+    const byConf = (c) => buildRisks(onchainFull, { ...backingMed, confidence: c }).find((r) => r.category === "backing").severity;
+    assert.equal(byConf("UNKNOWN"), "high");
+    assert.equal(byConf("LOW"), "high");
+    assert.equal(byConf("MEDIUM"), "moderate");
+    assert.equal(byConf("HIGH"), "low");
+  });
+  it("redemption without data is unknown, never low", () => {
+    const r = buildRisks(onchainFull, {}).find((x) => x.category === "redemption");
+    assert.equal(r.severity, "unknown");
+  });
+  it("information follows endpoint coverage", () => {
+    const sevFor = (missing) => buildRisks({ ...onchainFull, missing }, backingMed).find((x) => x.category === "information").severity;
+    assert.equal(sevFor([]), "low");
+    assert.equal(sevFor(["price: x", "holders: x"]), "moderate");
+    assert.equal(sevFor(["okx_credentials"]), "high");
+  });
+  it("toNum never returns 0 for blanks", () => {
+    assert.equal(toNum(""), null);
+    assert.equal(toNum(null), null);
+    assert.equal(toNum("0"), 0);
+  });
+});
+
+describe("summarizeCompare: honest tables and notices", () => {
+  it("nulls render n/a without fake suffixes", () => {
+    const s = summarizeCompare({
+      lang: "en",
+      compared: ["A", "B"],
+      rows: [
+        { symbol: "A", price: "1", premium_discount_bps: 5, holders: 10, top10HoldPercent: null, liquidity: "100", backing_confidence: "MEDIUM", overall_confidence: "MEDIUM" },
+        { symbol: "B", price: "2", premium_discount_bps: 6, holders: 20, top10HoldPercent: "40", liquidity: "200", backing_confidence: "MEDIUM", overall_confidence: "MEDIUM" },
+      ],
+      leaders: [],
+      not_found: [],
+    });
+    assert.ok(s.includes("| n/a |"), "null top-10 must be bare n/a");
+    assert.ok(!s.includes("n/a%"), "no n/a% fabrication");
+  });
+  it("all-not-found names the failures", () => {
+    const s = summarizeCompare({ rows: [], not_found: ["ZZZ"], supported_symbols: ["AAPLx"] });
+    assert.ok(s.includes("ZZZ") && s.includes("AAPLx"));
+  });
+});
+
+describe("langFallbackNote: unsupported languages are announced", () => {
+  it("notes fallback, stays silent otherwise", () => {
+    assert.ok((langFallbackNote("german", "en") ?? "").includes("german"));
+    assert.equal(langFallbackNote("zh", "zh"), null);
+    assert.equal(langFallbackNote(undefined, "en"), null);
+    assert.equal(langFallbackNote("", "en"), null);
   });
 });

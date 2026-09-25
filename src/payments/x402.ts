@@ -14,27 +14,27 @@ import { OKXFacilitatorClient } from "@okxweb3/x402-core";
 import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { loadOkxConfig } from "../okx/adapter.js";
-import { researchAsset, compareAssets, findAsset, supportedSymbols, fetchLiveQuote } from "../research/engines.js";
+import { researchAsset, compareAssets, findAsset, supportedSymbols, fetchLiveQuote, chainMeta, tokenlistRaw } from "../research/engines.js";
 
 const NETWORK = "eip155:196";
 export const PRICE_IDENTIFY = "$0.15";
 export const PRICE_PREVIEW = "$0.15";
 export const PRICE_RESEARCH = "$0.25";
 export const PRICE_COMPARE = "$0.50";
-// Public receipts log: last 50 paid-route calls (IPs stripped on read,
-// no wallet addresses — just route, detail, timestamp, settled flag).
-const receipts: { ts: string; paid_route: string; detail: string; settled: boolean; ip: unknown }[] = [];
+// Public receipts log: last 50 paid-route calls. No IPs, no wallet addresses —
+// route, detail, timestamp and settled flag only.
+const receipts: { ts: string; paid_route: string; detail: string; settled: boolean }[] = [];
 
-function usage(route: string, detail: string, req: Request): void {
-  const x402 = (req as unknown as Record<string, unknown>).x402 as
+function usage(route: string, detail: string, _req: Request): void {
+  const x402 = (_req as unknown as Record<string, unknown>).x402 as
     | { settleResult?: unknown; payment?: unknown }
     | undefined;
   const entry = {
     ts: new Date().toISOString(),
     paid_route: route,
-    detail,
+    // Cap detail: symbols are TICKER-validated upstream, belt and suspenders.
+    detail: String(detail ?? "").slice(0, 200),
     settled: !!x402,
-    ip: req.ip ?? null,
   };
   receipts.unshift(entry);
   if (receipts.length > 50) receipts.length = 50;
@@ -57,9 +57,14 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
       });
       const resourceServer = new x402ResourceServer(facilitator);
       resourceServer.register(NETWORK, new ExactEvmScheme());
-      // Handshake FIRST: if the facilitator is unreachable we stay free instead
-      // of mounting a paywall whose background sync would crash the process.
-      await resourceServer.initialize();
+      // Handshake FIRST with a deadline: if the facilitator hangs, boot must
+      // still reach listen() so /health serves and Render marks us live.
+      // A hung payments dependency must never sink the whole service.
+      const handshake = resourceServer.initialize();
+      const deadline = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("facilitator handshake timeout (8s)")), 8000)
+      );
+      await Promise.race([handshake, deadline]);
       paywall = paymentMiddleware(
         {
           "POST /api/identify": {
@@ -94,23 +99,49 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
   // Parameter validation runs BEFORE the paywall: buyers must get a 400 for
 // bad input without ever seeing a payment challenge. (Review rejects services
 // that charge first and validate later.)
-const TICKER = /^[A-Za-z0-9.\-]{1,20}$/;
+// Paths are normalized (trailing slash) because the paywall normalizes too —
+// validation and charging must agree on what a route is.
+const TICKER = /^(?=.*[A-Za-z0-9])[A-Za-z0-9.\-]{1,20}$/;
+const FOCUS = ["full", "issuer", "backing", "risks"] as const;
+const LANG_RE = /^[a-z]{2}(-[a-z]{2})?$/;
+
+function normPath(req: Request): string {
+  const p = req.path === "/" ? "/" : req.path.replace(/\/+$/, "");
+  return `${req.method} ${p}`;
+}
+
+function badSymbol(s: unknown): boolean {
+  return typeof s !== "string" || !TICKER.test(s.trim());
+}
 
 function validatePaidBody(req: Request, res: Response, next: () => void): void {
-  if (req.method === "POST" && req.path === "/api/research") {
+  const route = normPath(req);
+  if (route === "POST /api/research") {
     const s: unknown = req.body?.symbol;
-    if (typeof s !== "string" || s.trim().length < 1 || !TICKER.test(s.trim())) {
+    if (badSymbol(s)) {
       res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
       return;
     }
+    const f: unknown = req.body?.focus;
+    if (f !== undefined && (typeof f !== "string" || !(FOCUS as readonly string[]).includes(f))) {
+      res.status(400).json({ ok: false, error: "invalid focus: full|issuer|backing|risks" });
+      return;
+    }
   }
-  if (req.method === "POST" && req.path === "/api/compare") {
+  if (route === "POST /api/compare") {
     const arr: unknown = req.body?.symbols;
     const ok =
       Array.isArray(arr) && arr.length >= 1 && arr.length <= 4 &&
-      arr.every((x: unknown) => typeof x === "string" && x.trim().length >= 1 && TICKER.test(x.trim()));
+      arr.every((x: unknown) => typeof x === "string" && TICKER.test(x.trim()));
     if (!ok) {
       res.status(400).json({ ok: false, error: "invalid symbols: array of 1-4 ticker strings" });
+      return;
+    }
+  }
+  if (route === "POST /api/identify") {
+    const s: unknown = req.body?.symbol;
+    if (badSymbol(s)) {
+      res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
       return;
     }
   }
@@ -118,18 +149,21 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
 }
 
   // Validation first, then paywall, then handlers — in that order.
+  // (/mcp and /health are registered before this and intentionally bypass
+  // both: MCP tools validate per-tool via zod, health needs no validation.)
   app.use(validatePaidBody);
   if (paywall) app.use(paywall);
 
-  // Handlers: identify is FREE (funnel — discovery costs nothing).
-  // research/compare go through the paywall above when configured.
+  // Handlers: identify, preview, research and compare are ALL paywalled when
+  // configured (MCP tools stay free). Prices: PRICE_* below.
 
   const runResearch = async (req: Request, res: Response): Promise<void> => {
     const symbol = typeof req.body?.symbol === "string" ? req.body.symbol : "";
-    const focus = typeof req.body?.focus === "string" ? req.body.focus : "full";
+    const focusRaw: unknown = req.body?.focus;
+    const focus = typeof focusRaw === "string" && (FOCUS as readonly string[]).includes(focusRaw) ? focusRaw : "full";
     const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
     usage("research", symbol, req);
-    const result = await researchAsset(symbol, focus === "issuer" || focus === "backing" || focus === "risks" ? focus : "full", { price: PRICE_RESEARCH, lang });
+    const result = await researchAsset(symbol, focus as "full" | "issuer" | "backing" | "risks", { price: PRICE_RESEARCH, lang });
     res.json({ ok: true, data: result });
   };
 
@@ -149,6 +183,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       return;
     }
     const live = await fetchLiveQuote(asset.symbol);
+    const chain = chainMeta();
     res.json({
       ok: true,
       data: {
@@ -156,7 +191,10 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
         issuer: asset.issuer, issuer_legal: asset.issuer_legal ?? null,
         underlying_asset: asset.underlying_asset, underlying: asset.underlying ?? null,
         chains: asset.chains, chainIds: asset.chainIds,
+        chain_info: { rpc: chain.rpc, explorer: chain.explorer },
+        contract_addresses: asset.contract_addresses,
         official_website: asset.official_website, official_documents: asset.official_documents,
+        tokenlist_raw: tokenlistRaw(),
         product_page: asset.product_page ?? null,
         issuer_published_contract: asset.issuer_published_contract ?? null,
         issuer_contract_explorer: asset.issuer_published_contract
@@ -167,19 +205,27 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
     });
   };
 
+  // Public errors stay generic; details go to server logs only.
+  const fail = (route: string) => (e: unknown) => {
+    console.error(`${route} failed:`, e instanceof Error ? e.message : String(e));
+  };
+
   app.post("/api/research", (req: Request, res: Response) => {
     runResearch(req, res).catch((e: unknown) => {
-      if (!res.headersSent) res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      fail("research")(e);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "research_unavailable" });
     });
   });
   app.post("/api/compare", (req: Request, res: Response) => {
     runCompare(req, res).catch((e: unknown) => {
-      if (!res.headersSent) res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      fail("compare")(e);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "compare_unavailable" });
     });
   });
   app.post("/api/identify", (req: Request, res: Response) => {
     runIdentify(req, res).catch((e: unknown) => {
-      if (!res.headersSent) res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      fail("identify")(e);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "identify_unavailable" });
     });
   });
 
@@ -210,10 +256,10 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       info: { title: "Uzam RWA Intelligence API", version: "0.1.0", description: "Evidence-backed research on xStocks tokenized equities (X Layer 196). Identify free, depth paid via x402." },
       servers: [{ url: base }],
       paths: {
-        "/api/identify": { post: { summary: "Free asset identifier", requestBody: asJson(symbolSchema) } },
+        "/api/identify": { post: { summary: `Asset identifier (${PRICE_IDENTIFY} via x402 when configured)`, requestBody: asJson(symbolSchema) } },
         "/api/research": { post: { summary: `Full report (${PRICE_RESEARCH} via x402)`, requestBody: asJson(researchSchema) } },
         "/api/compare": { post: { summary: `Compare up to 4 (${PRICE_COMPARE} via x402)`, requestBody: asJson(compareSchema) } },
-        "/api/research/preview": { get: { summary: "Free capped preview (identity only)" } },
+        "/api/research/preview": { get: { summary: `Capped preview, identity only (${PRICE_PREVIEW} via x402 when configured)` } },
         "/api/receipts": { get: { summary: "Public log of recent paid-route calls" } },
       },
     });
@@ -228,23 +274,29 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
     );
   });
 
-  // Free capped preview: identity only, zero external fetches.
+  // Capped preview: identity only, zero external fetches. Paid when configured.
   app.get("/api/research/preview", (req: Request, res: Response) => {
     const symbol = typeof req.query.symbol === "string" ? req.query.symbol : "";
-    const lang = typeof req.query.lang === "string" ? req.query.lang : undefined;
+    const langRaw: unknown = req.query.lang;
     if (!symbol.trim() || !TICKER.test(symbol.trim())) {
       res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
       return;
     }
+    if (langRaw !== undefined && (typeof langRaw !== "string" || !LANG_RE.test(langRaw.trim().toLowerCase()))) {
+      res.status(400).json({ ok: false, error: "invalid lang: en|zh|es|fr" });
+      return;
+    }
+    const lang = typeof langRaw === "string" ? langRaw : undefined;
     researchAsset(symbol, "issuer", { lang })
       .then((result) => res.json({ ok: true, preview: true, data: result }))
       .catch((e: unknown) => {
-        if (!res.headersSent) res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        console.error("preview failed:", e instanceof Error ? e.message : String(e));
+        if (!res.headersSent) res.status(500).json({ ok: false, error: "preview_unavailable" });
       });
   });
 
   app.get("/api/receipts", (_req: Request, res: Response) => {
-    res.json({ ok: true, receipts: receipts.map(({ ip, ...rest }) => rest) });
+    res.json({ ok: true, receipts });
   });
 
   // One-click agent install: paste into Claude Desktop / Cursor MCP config.
@@ -254,7 +306,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       `# Uzam MCP — add to Claude Desktop (claude_desktop_config.json) or Cursor (~/.cursor/mcp.json):\n` +
       `{\n  "mcpServers": {\n    "uzam": { "url": "${base}/mcp" }\n  }\n}\n` +
       `# Then ask: "Use Uzam to compare AAPLx vs TSLAx backing and biggest unanswered risks."\n` +
-      `# REST: free identify + preview, paid research/compare via x402 — see ${base}/.well-known/x402\n`
+      `# REST (paid via x402 when configured — identify ${PRICE_IDENTIFY}, preview ${PRICE_PREVIEW}, research ${PRICE_RESEARCH}, compare ${PRICE_COMPARE}): see ${base}/.well-known/x402\n`
     );
   });
 

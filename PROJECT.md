@@ -41,7 +41,7 @@ Use **xStocks on X Layer**:
 - OKX Onchain OS Market endpoints used by Uzam (chainIndex 196). Wallet/Trade APIs not used.
 - xStocks: 1:1 backed tokenized US stocks/ETFs, issued via Backed Finance network, redeemable for cash value
 - Count: ~690 tokens on X Layer per xStocks tokenlist (3512 total; count moves — re-check live)
-- Test assets: AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx (8 xStocks)
+- Test assets: AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx (16 xStocks)
 - Tokenlist source: https://github.com/backed-fi/cowswap-xstocks-tokenlist (Uniswap format, has addresses + decimals + chainId 196)
 - Explorer: https://www.okx.com/web3/explorer/xlayer
 
@@ -57,7 +57,7 @@ AI Agent (Claude / Cursor)
  v (MCP Streamable HTTP)
 UZAM /mcp
  |
- +-- registry (static list of 8 test assets + docs links, src/data/xlayer-assets.json)
+ +-- registry (static list of 16 test assets + docs links, src/data/xlayer-assets.json)
  +-- OKXOnchainAdapter (calls OKX Market MCP/API for price/holders/trades)
  +-- WebResearchProvider (search + fetch, interface only for MVP)
  +-- Evidence builder (claim + url + type + confidence)
@@ -83,14 +83,15 @@ Risk categories (fixed list): issuer, backing, redemption, liquidity, smart_cont
 - Server: `express` + `zod` validation + `dotenv`
 - Docs fetch: native `fetch` + simple HTML text extract for MVP
 - Data: local JSON file, no Postgres for MVP (add later if needed)
-- Deploy: Render Web Service, `npm run build && npm start`, health check `/health`, public `https://uzam.onrender.com/mcp`
+- Deploy: Render Web Service, `npm run build && npm start`, health check `/health`, public `https://uzam-m3pi.onrender.com/mcp`
 
-Env vars (never commit — see .env.example for all six):
+Env vars (never commit — see .env.example (seven vars incl. PAY_TO_ADDRESS)):
 ```
 OKX_ACCESS_KEY=
 OKX_SECRET_KEY=
 OKX_PASSPHRASE=
 OKX_PROJECT_ID=
+PAY_TO_ADDRESS=
 ALLOWED_HOSTS=
 PORT=3000
 ```
@@ -117,13 +118,14 @@ Other tools (no install size, web only):
 
 ## 8. Build order (for 17-25 Sept online build)
 Phase 1: `npm init` + TS + `/health` + `/mcp` hello (Streamable HTTP). Test with MCP Inspector.
-Phase 2: `src/data/xlayer-assets.json` with 8 xStocks + `identify_asset`.
+Phase 2: `src/data/xlayer-assets.json` with 16 xStocks + `identify_asset`.
 Phase 3: `OKXOnchainAdapter` (chainIndex 196) + `analyze_onchain`. Test AAPLx on X Layer.
 Phase 4: `WebResearchProvider` interface (search/fetch stub) + doc link return.
 Phase 5: `analyze_backing` with FACT/CLAIM/UNKNOWN split.
 Phase 6: `research_asset` orchestrator + risks + unknowns + confidence.
 Phase 7: `compare_assets`.
-Phase 8: Deploy to Render, connect Claude Desktop/Cursor to `https://<your-app>.onrender.com/mcp`, demo: "Compare AAPLx vs TSLAx backing + biggest unanswered risks?"
+Phase 8: Deploy to Render, connect Claude Desktop/Cursor to `https://uzam-m3pi.onrender.com/mcp`, demo: "Compare AAPLx vs TSLAx backing + biggest unanswered risks?"
+Phase 9 (shipped): paid REST via x402 (identify $0.15, preview $0.15, research $0.25, compare $0.50), landing page at `/` with live try-widget, 4-language reports, 16 assets, approved A2MCP listing on OKX.AI (#13653).
 
 Do NOT build: dashboard, login, token, trading, wallet connect, Postgres, vector DB, dozens of chains.
 

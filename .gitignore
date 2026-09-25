@@ -5,3 +5,8 @@ dist/
 npm-debug.log
 *.log
 .DS_Store
+
+# local images (avatars etc. live on CDN, never commit binaries)
+*.jpg
+*.jpeg
+*.png

@@ -20,4 +20,4 @@ services:
       - key: PAY_TO_ADDRESS
         sync: false
       - key: ALLOWED_HOSTS
-        sync: false
+        value: uzam-m3pi.onrender.com

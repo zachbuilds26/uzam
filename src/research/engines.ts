@@ -9,7 +9,7 @@ import {
   fetchPage, extractPassages, BACKING_KEYWORDS, REDEMPTION_KEYWORDS, fetchNews,
   tierOf, itemConfidence,
 } from "./provider.js";
-import { normalizeLang, t, sev } from "./i18n.js";
+import { normalizeLang, t, sev, langFallbackNote } from "./i18n.js";
 import type { SourceType } from "./provider.js";
 
 type RegistryAsset = {
@@ -35,8 +35,23 @@ export type AnyObj = Record<string, any>;
 const registry = registryJson as {
   chain: { name: string; chainId: number; chainIndex: number };
   tokenlist: string;
+  tokenlist_raw?: string;
   assets: RegistryAsset[];
 };
+
+const CHAIN_ID_196 = registry.chain.chainId;
+
+/** Chain facts for API layers that don't own the registry (identify parity). */
+export function chainMeta(): { name: string; chainId: number; chainIndex: number; rpc: string | null; explorer: string | null } {
+  const c = (registryJson as AnyObj).chain as AnyObj | undefined;
+  return {
+    name: String(c?.name ?? "X Layer"),
+    chainId: Number(c?.chainId ?? 196),
+    chainIndex: Number(c?.chainIndex ?? 196),
+    rpc: typeof c?.rpc === "string" ? c.rpc : null,
+    explorer: typeof c?.explorer === "string" ? c.explorer : null,
+  };
+}
 
 export const now = (): string => new Date().toISOString();
 
@@ -52,13 +67,21 @@ export function supportedSymbols(): string[] {
 // ---- Independent verification: Backed xStocks tokenlist (third-party, Tier 2) ----
 // Checks the OKX-resolved contract against the public tokenlist for chain 196.
 // Cached in memory for 1h so we don't refetch ~3500 tokens per call.
-const TOKENLIST_RAW = "https://raw.githubusercontent.com/backed-fi/cowswap-xstocks-tokenlist/main/tokenlist.json";
+// Single source of truth for the independent tokenlist (mirrors registry).
+const TOKENLIST_RAW =
+  registry.tokenlist_raw ?? "https://raw.githubusercontent.com/backed-fi/cowswap-xstocks-tokenlist/main/tokenlist.json";
+
+/** Tokenlist URL for API layers (identify parity). */
+export function tokenlistRaw(): string {
+  return TOKENLIST_RAW;
+}
 let tlCache: { at: number; tokens: AnyObj[] } | null = null;
 let tlInflight: Promise<AnyObj[]> | null = null;
+let tlFailedAt = 0;
 
 function lookupTokenlist(contract: string): { listed: boolean; matched_symbol: string | null } {
   const hit = tlCache?.tokens.find(
-    (t) => Number(t.chainId) === 196 && String(t.address ?? "").toLowerCase() === contract.toLowerCase()
+    (t) => Number(t.chainId) === CHAIN_ID_196 && String(t.address ?? "").toLowerCase() === contract.toLowerCase()
   );
   return { listed: !!hit, matched_symbol: hit ? String((hit as AnyObj).symbol ?? "") : null };
 }
@@ -89,10 +112,17 @@ async function fetchTokenlist(): Promise<AnyObj[]> {
 export async function verifyTokenlist(contract: string): Promise<{ listed: boolean; matched_symbol: string | null; stale?: boolean; error?: string }> {
   const fresh = tlCache && Date.now() - tlCache.at < 3600_000;
   if (fresh) return lookupTokenlist(contract);
+  // Negative backoff: a dead tokenlist host must not cost every request a
+  // doomed 20s fetch (compare would pay it 4x serially — now in parallel).
+  if (Date.now() - tlFailedAt < 300_000) {
+    if (tlCache) return { ...lookupTokenlist(contract), stale: true };
+    return { listed: false, matched_symbol: null, error: "tokenlist fetch backing off (recent failure)" };
+  }
   try {
     await fetchTokenlist();
     return lookupTokenlist(contract);
   } catch (e) {
+    tlFailedAt = Date.now();
     if (tlCache) return { ...lookupTokenlist(contract), stale: true };
     return { listed: false, matched_symbol: null, error: `tokenlist fetch failed: ${e instanceof Error ? e.message : String(e)}` };
   }
@@ -132,10 +162,7 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
       onchain: null, missing, confidence: "LOW", data_timestamp: dataTimestamp,
     };
   }
-  if (contract && !/^0x[0-9a-fA-F]{40}$/.test(contract)) {
-    missing.push("contract_on_xlayer: search returned a non-EVM address; refusing to query further");
-  }
-  const lc = (contract ?? "").toLowerCase();
+  const lc = contract.toLowerCase();
   const item = { chainIndex: XLAYER_CHAIN_INDEX, tokenContractAddress: lc };
   let price: AnyObj | null = null;
   let info: AnyObj | null = null;
@@ -157,20 +184,26 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   else missing.push(`holders: ${holdRes.error ?? "no data (Premium tier?)"}`);
 
   // Batch 2: history + activity (all Basic tier — works on any key).
+  // Response arrays are capped BEFORE parsing: OKX `limit` params are hints,
+  // a misbehaving upstream must not balloon CPU/memory downstream.
   let candles: AnyObj[] = [];
   let trades: AnyObj[] = [];
   let pools: AnyObj[] = [];
-  const [candleRes, tradeRes, poolRes] = await Promise.all([
+  let meta: AnyObj | null = null;
+  const [candleRes, tradeRes, poolRes, metaRes] = await Promise.all([
     okx.getCandles(XLAYER_CHAIN_INDEX, lc, "1Dutc", "30"),
     okx.getTrades(XLAYER_CHAIN_INDEX, lc, "20"),
     okx.getTopLiquidity(XLAYER_CHAIN_INDEX, lc),
+    okx.getBasicInfo([item]),
   ]);
-  if (candleRes.ok && Array.isArray(candleRes.data)) candles = candleRes.data as AnyObj[];
+  if (candleRes.ok && Array.isArray(candleRes.data)) candles = (candleRes.data as AnyObj[]).slice(0, 200);
   else missing.push(`candles: ${candleRes.error ?? "no data"}`);
-  if (tradeRes.ok && Array.isArray(tradeRes.data)) trades = tradeRes.data as AnyObj[];
+  if (tradeRes.ok && Array.isArray(tradeRes.data)) trades = (tradeRes.data as AnyObj[]).slice(0, 200);
   else missing.push(`trades: ${tradeRes.error ?? "no data"}`);
   if (poolRes.ok && Array.isArray(poolRes.data)) pools = poolRes.data as AnyObj[];
   else missing.push(`pools: ${poolRes.error ?? "no data"}`);
+  if (metaRes.ok && Array.isArray(metaRes.data) && metaRes.data[0]) meta = metaRes.data[0] as AnyObj;
+  else missing.push(`token_meta: ${metaRes.error ?? "no data"}`);
 
   const priceHistory = summarizeCandles(candles);
   const tradeFeed = summarizeTrades(trades);
@@ -179,11 +212,13 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   // Independent check: does the public tokenlist list this exact contract on 196?
   const extra_evidence: AnyObj[] = [];
   let tokenlist_check: AnyObj = { checked: false };
-  const tl = await verifyTokenlist(contract);  if (tl.error) {
+  const tl = await verifyTokenlist(contract);
+  if (tl.error) {
     missing.push(`tokenlist: ${tl.error}`);
     tokenlist_check = { checked: false, error: tl.error };
   } else if (tl.listed) {
-    tokenlist_check = { checked: true, listed: true, matched_symbol: tl.matched_symbol };
+    tokenlist_check = { checked: true, listed: true, matched_symbol: tl.matched_symbol, ...(tl.stale ? { stale: true } : {}) };
+    if (tl.stale) missing.push("tokenlist: showing stale cache (fetch failed)");
     extra_evidence.push({
       claim: "Independent tokenlist lists this exact contract on X Layer (chain 196).",
       source_title: "xStocks Token List (Backed, CowSwap format)",
@@ -207,8 +242,8 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
         claim: "OKX-resolved contract matches the issuer-published contract for this symbol.",
         source_title: "xStocks product data (issuer-published addresses)",
         source_url: asset.product_page ?? "https://xstocks.fi/products",
-        excerpt: `Contract ${contract} resolved via OKX search is identical to the address xStocks publishes for ${asset.symbol} — two independent sources agree this is the genuine token.`,
-        basis: "fact", source_type: "official_issuer" as SourceType, tier: 1, confidence: "MEDIUM", retrieved_at: now(),
+        excerpt: `Resolved contract equals the issuer-published address for ${asset.symbol} — observed agreement between two sources, corroboration rather than onchain proof of backing.`,
+        basis: "claim", source_type: "official_issuer" as SourceType, tier: 1, confidence: "MEDIUM", retrieved_at: now(),
       });
     } else {
       contract_crosscheck = { checked: true, agrees: false, published, resolved: contract };
@@ -221,13 +256,24 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
     .sort((a, b) => b.percent - a.percent)
     .slice(0, 5);
   const top3 = top.slice(0, 3).reduce((s, h) => s + h.percent, 0);
+  // Upstream free-text caps: exchange-controlled strings are display data,
+  // never trusted content — cap before they enter observations/evidence.
+  const capStr = (v: unknown, n = 200): string => String(v ?? "").slice(0, n);
+  const sp = advanced?.stockProfile as { companyName?: unknown; stockCode?: unknown; exchange?: unknown } | undefined;
+  const explorerUrl = typeof hit?.explorerUrl === "string" && hit.explorerUrl.startsWith("https://")
+    ? hit.explorerUrl.slice(0, 500)
+    : `https://www.okx.com/web3/explorer/xlayer/token/${contract}`;
   const observations: string[] = [];
   if (priceHistory) observations.push(`30d range: low ${priceHistory.low} / high ${priceHistory.high} (${priceHistory.points} daily candles, ${priceHistory.change_pct ?? "n/a"}% change).`);
   if (tradeFeed && (tradeFeed.buys + tradeFeed.sells) > 0) observations.push(`Recent trades: ${tradeFeed.buys} buys / ${tradeFeed.sells} sells in last ${tradeFeed.sampled} swaps.`);
   if (poolBreakdown && poolBreakdown.pools.length > 0) observations.push(`Liquidity sits in ${poolBreakdown.pools.length} pool(s), top: ${poolBreakdown.pools[0].label}.`);
   if (advanced?.top10HoldPercent !== null && advanced?.top10HoldPercent !== undefined && advanced?.top10HoldPercent !== "") observations.push(`Top 10 holders control ${advanced.top10HoldPercent}% of supply (OKX advanced-info).`);
   if (top.length > 0) observations.push(`Largest holder: ${top[0].address.slice(0, 10)}… at ${top[0].percent}%. Top 3 combined: ${top3.toFixed(2)}%.`);
-  if (advanced?.stockProfile) observations.push(`OKX reports underlying stock profile: ${advanced.stockProfile.companyName ?? ""} (${advanced.stockProfile.stockCode ?? ""}, ${advanced.stockProfile.exchange ?? ""}). Exchange data, not issuer verification.`);
+  if (sp) {
+    observations.push(
+      `OKX reports underlying stock profile: ${capStr(sp.companyName)} (${capStr(sp.stockCode, 20)}, ${capStr(sp.exchange, 40)}). Cross-check against issuer docs — this is exchange data, not issuer verification.`
+    );
+  }
   if (missing.length > 0) observations.push(`Partial data: ${missing.length} source(s) unavailable. See missing[].`);
   if (tokenlist_check.listed) observations.push(`Independent tokenlist confirms this contract as ${tokenlist_check.matched_symbol} on X Layer — agrees with OKX.`);
   const ratios = tradeRatios(info?.volume24H, info?.liquidity ?? hit?.liquidity, info?.marketCap ?? hit?.marketCap, info?.txs24H);
@@ -235,14 +281,19 @@ export async function gatherOnchain(clean: string, asset: RegistryAsset): Promis
   return {
     found: true, symbol: asset.symbol, name: asset.name,
     chains: ["X Layer"], contracts: [contract],
-    explorer: hit?.explorerUrl ?? `https://www.okx.com/web3/explorer/xlayer/token/${contract}`,
+    explorer: explorerUrl,
     search_price: hit?.price ?? null,
     stock_profile: advanced?.stockProfile ?? null,
     tokenlist_check,
     contract_crosscheck,
     extra_evidence,
-    supply: info?.circSupply ? { circulating: info.circSupply } : {},
-    holders_count: info?.holders ?? hit?.holders ?? null,
+    token_meta: meta ? {
+      name: capStr(meta.name ?? meta.tokenName, 120) || null,
+      symbol: capStr(meta.symbol ?? meta.tokenSymbol, 20) || null,
+      decimals: Number.isInteger(Number(meta.decimals)) ? Number(meta.decimals) : null,
+    } : null,
+    supply: info?.circSupply ? { circulating: info.circSupply } : null,
+    holders_count: toNum(info?.holders ?? hit?.holders),
     holder_concentration: {
       top10HoldPercent: advanced?.top10HoldPercent ?? null,
       top3Percent: top.length > 0 ? Number(top3.toFixed(2)) : null,
@@ -322,10 +373,15 @@ export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
         data_timestamp: stamp,
       };
     })();
-    const timeout = new Promise<AnyObj>((resolve) =>
-      setTimeout(() => resolve({ available: false, reason: "timeout_12s", data_timestamp: stamp }), 12000)
-    );
-    return await Promise.race([work, timeout]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<AnyObj>((resolve) => {
+      timer = setTimeout(() => resolve({ available: false, reason: "timeout_12s", data_timestamp: stamp }), 12000);
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   } catch (e) {
     return { available: false, reason: `quote failed: ${e instanceof Error ? e.message : String(e)}`, data_timestamp: stamp };
   }
@@ -348,6 +404,9 @@ export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
       fullTexts.push(doc.text);
       const st: SourceType = "official_issuer";
       for (const p of extractPassages(doc.text, BACKING_KEYWORDS)) {
+        // Evidence capped at 10 with an explicit flag — unbounded excerpts
+        // bloat every downstream report.
+        if (evidence.length >= 10) break;
         evidence.push({
           claim: "Issuer describes backing/custody/redemption on its official site.",
           source_title: doc.title, source_url: doc.url, excerpt: p, basis: "claim",
@@ -385,7 +444,7 @@ export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
     redemption_excerpts: redemptionExcerpts,
     geo_excerpts: geoExcerpts,
     attestation_links: attestationLinks,
-    evidence, pages_read: fetched,
+    evidence, evidence_truncated: evidence.length >= 10, pages_read: fetched,
     confidence: evidence.length >= 3 && fetched.length >= 2 ? "MEDIUM" : evidence.length > 0 ? "LOW" : "UNKNOWN",
     unanswered_questions: unanswered,
     data_timestamp: now(),
@@ -401,37 +460,52 @@ export type Risk = {
 };
 
 export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
+  // Thresholds (provisional, revisit after N reports — documented, not magic):
+  // top-10 >80% ≈ single-wallet control; <$50k pool = one trade moves price.
+  const CONC_HIGH = 80;
+  const CONC_MODERATE = 50;
+  const LIQ_HIGH = 50000;
+  const LIQ_MODERATE = 500000;
   const top10 = toNum(onchain?.holder_concentration?.top10HoldPercent);
-  const liq = toNum(onchain?.trading_activity?.liquidity);
+  // Raw figure for math (display strings round and can flip boundaries).
+  const liq = toNum(onchain?.trading_activity?.liquidity_raw ?? onchain?.trading_activity?.liquidity);
   const missing: string[] = Array.isArray(onchain?.missing) ? onchain.missing : [];
+  const cov = okxCoverage(missing);
+  const uq: string[] | null = Array.isArray(backing?.unanswered_questions) ? backing.unanswered_questions : null;
+  const redemptEx: unknown[] = Array.isArray(backing?.redemption_excerpts) ? backing.redemption_excerpts : [];
+  const geoEx: unknown[] = Array.isArray(backing?.geo_excerpts) ? backing.geo_excerpts : [];
+  const pagesRead: string[] = Array.isArray(backing?.pages_read) ? backing.pages_read : [];
+  const backingConf: string | null = typeof backing?.confidence === "string" ? backing.confidence : null;
   const risks: Risk[] = [
     {
       category: "concentration",
-      severity: top10 === null ? "unknown" : top10 > 80 ? "high" : top10 > 50 ? "moderate" : "low",
+      severity: top10 === null ? "unknown" : top10 > CONC_HIGH ? "high" : top10 > CONC_MODERATE ? "moderate" : "low",
       reason: top10 === null ? "No holder distribution data available." : `Top 10 holders control ${Number(top10.toFixed(2))}% of supply.`,
       evidence: top10 === null ? [] : ["okx:advanced-info:top10HoldPercent"],
     },
     {
       category: "liquidity",
-      severity: liq === null ? "unknown" : liq < 50000 ? "high" : liq < 500000 ? "moderate" : "low",
+      severity: liq === null ? "unknown" : liq < LIQ_HIGH ? "high" : liq < LIQ_MODERATE ? "moderate" : "low",
       reason: liq === null ? "No liquidity figure available." : `Observed pool liquidity $${fmtNum(liq) ?? liq} (OKX). Thin books can mean large price impact.`,
       evidence: liq === null ? [] : ["okx:price-info:liquidity"],
     },
     {
+      // Weak or missing backing evidence is itself the risk — fail toward high.
       category: "backing",
-      severity: backing?.confidence === "UNKNOWN" ? "high" : backing?.confidence === "LOW" ? "moderate" : "low",
-      reason: `Backing evidence confidence is ${backing?.confidence ?? "UNKNOWN"}. Issuer statements are claims until independently verified.`,
+      severity: backingConf === "HIGH" ? "low" : backingConf === "MEDIUM" ? "moderate" : "high",
+      reason: `Backing evidence confidence is ${backingConf ?? "UNKNOWN"}. Issuer statements are claims until independently verified.`,
       evidence: ["uzam:analyze_backing"],
     },
     {
+      // No data about redemption => unknown, never a reassuring low.
       category: "redemption",
-      severity: String(backing?.unanswered_questions ?? []).match(/redemption mechanics/i) ? "moderate" : "low",
+      severity: uq === null ? "unknown" : redemptEx.length === 0 ? "moderate" : "low",
       reason: "Redemption eligibility, minimums and settlement must be confirmed in issuer terms before assuming exit is available.",
       evidence: ["uzam:analyze_backing"],
     },
     {
       category: "issuer",
-      severity: "low",
+      severity: pagesRead.length === 0 ? "unknown" : "low",
       reason: "xStocks/Backed is an established tokenized-equity issuer network (issuer claim — see evidence). Single-issuer dependency remains.",
       evidence: ["issuer:official_site"],
     },
@@ -449,14 +523,14 @@ export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
     },
     {
       category: "regulatory_access",
-      severity: "moderate",
+      severity: geoEx.length > 0 ? "moderate" : "unknown",
       reason: "Tokenized equities typically carry geo and eligibility restrictions (e.g. xStocks excludes several jurisdictions). Confirm eligibility in issuer terms.",
       evidence: ["issuer:terms"],
     },
     {
       category: "information",
-      severity: missing.length > 2 ? "moderate" : "low",
-      reason: missing.length === 0 ? "All expected sources returned data." : `Gaps in this report: ${missing.join("; ")}.`,
+      severity: cov.ok >= cov.total ? "low" : cov.ok >= 5 ? "moderate" : "high",
+      reason: cov.ok >= cov.total ? "All 7 OKX endpoints returned data." : `Only ${cov.ok}/${cov.total} OKX endpoints returned data: ${missing.join("; ")}.`,
       evidence: [],
     },
   ];
@@ -466,8 +540,8 @@ export function buildRisks(onchain: AnyObj, backing: AnyObj): Risk[] {
 // ---- Contradiction detection (PDF section 18): never silently pick a side ----
 export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): AnyObj[] {
   const out: AnyObj[] = [];
-  // Check 1: underlying code — registry ("AAPL (Apple ...)") vs OKX stockProfile.
-  const expected = asset.underlying_asset.split(/[\s(]/)[0].toUpperCase();
+  // Check 1: underlying code — registry explicit ticker preferred (ETF-safe).
+  const expected = (asset.underlying?.ticker ?? asset.underlying_asset.split(/[\s(]/)[0]).toUpperCase();
   const reported = onchain?.stock_profile?.stockCode ? String(onchain.stock_profile.stockCode).toUpperCase() : null;
   if (expected && reported && expected !== reported) {
     out.push({
@@ -478,9 +552,9 @@ export function detectContradictions(asset: RegistryAsset, onchain: AnyObj): Any
       recommended_action: "Review the latest issuer Final Terms / prospectus before concluding which exposure is correct.",
     });
   }
-  // Check 2: price consistency — OKX search quote vs price endpoint.
+  // Check 2: price consistency — OKX search quote vs price endpoint (raws).
   const a = Number(onchain?.search_price);
-  const b = Number(onchain?.trading_activity?.price);
+  const b = Number(onchain?.trading_activity?.price_raw ?? onchain?.trading_activity?.price);
   if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
     const drift = Math.abs(a - b) / ((a + b) / 2);
     if (drift > 0.1) {
@@ -551,7 +625,7 @@ function isBlank(v: unknown): boolean {
   return v === null || v === undefined || v === "" || typeof v === "boolean";
 }
 
-function toNum(v: unknown): number | null {
+export function toNum(v: unknown): number | null {
   if (isBlank(v)) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -596,10 +670,18 @@ const OKX_CORE = ["price", "price_info", "advanced_info", "holders", "candles", 
 
 export function okxCoverage(missing: unknown): { ok: number; total: number } {
   const total = OKX_CORE.length;
-  if (!Array.isArray(missing)) return { ok: total, total };
+  // Absent list proves nothing — never count it as full coverage.
+  if (!Array.isArray(missing)) return { ok: 0, total };
   // No credentials, no identity, or no contract = no data call was possible.
-  if (missing.includes("skipped_by_focus") || missing.includes("okx_credentials") || missing.includes("asset_identity") || missing.includes("contract_on_xlayer")) return { ok: 0, total };
-  const failed = new Set(missing.map((m) => String(m).split(":")[0].trim()));
+  // Colon-suffixed variants (e.g. "contract_on_xlayer: ...") must match too.
+  const strs = missing.map((m) => String(m).split(":")[0].trim());
+  if (
+    strs.includes("skipped_by_focus") ||
+    strs.includes("okx_credentials") ||
+    strs.includes("asset_identity") ||
+    strs.includes("contract_on_xlayer")
+  ) return { ok: 0, total };
+  const failed = new Set(strs);
   return { ok: OKX_CORE.filter((k) => !failed.has(k)).length, total };
 }
 
@@ -706,21 +788,48 @@ export function detectNamedCustodian(excerpts: string[]): string | null {
 type Spot = { price: number | null; date: string | null; time: string | null; error?: string };
 let spotCache: Record<string, { at: number; spot: Spot }> = {};
 
+// Capped JSON fetch: fixed host + validated path segment + body cap before
+// parse. Mirrors the tokenlist pattern — never bare res.json() on third parties.
+async function fetchJsonCapped(
+  url: string, headers: Record<string, string>, capBytes = 1_000_000, timeoutMs = 15000
+): Promise<{ json?: AnyObj; error?: string; status?: number }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!res.ok) return { error: `HTTP ${res.status}`, status: res.status };
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    return { error: `unreadable body (HTTP ${res.status})`, status: res.status };
+  }
+  if (text.length > capBytes) return { error: `response too large (${text.length} chars)`, status: res.status };
+  try {
+    return { json: JSON.parse(text) as AnyObj };
+  } catch {
+    return { error: `non-JSON response (HTTP ${res.status})`, status: res.status };
+  }
+}
+
 export async function fetchSpot(code: string): Promise<Spot & { stale?: boolean }> {
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(code)) {
+    return { price: null, date: null, time: null, error: "invalid ticker for spot lookup" };
+  }
   const key = code.toUpperCase();
   const cached = spotCache[key];
   if (cached && Date.now() - cached.at < 60_000) return cached.spot;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${key}?interval=1d&range=5d`;
   const fail = (error: string): Spot & { stale?: boolean } =>
     cached ? { ...cached.spot, stale: true } : { price: null, date: null, time: null, error };
+  const out = await fetchJsonCapped(url, {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+  });
+  if (out.error || !out.json) return fail(`spot ${out.error ?? "unknown"}`);
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return fail(`spot HTTP ${res.status}`);
-    const json = (await res.json()) as AnyObj;
-    const meta = json?.chart?.result?.[0]?.meta;
+    const meta = out.json?.chart?.result?.[0]?.meta;
     const px = Number(meta?.regularMarketPrice);
     const t = Number(meta?.regularMarketTime);
     if (!Number.isFinite(px) || px <= 0) return fail("spot quote unparseable");
@@ -730,10 +839,15 @@ export async function fetchSpot(code: string): Promise<Spot & { stale?: boolean 
       time: t ? new Date(t * 1000).toISOString().slice(11, 16) + " UTC" : null,
     };
     spotCache[key] = { at: Date.now(), spot };
-    if (Object.keys(spotCache).length > 50) spotCache = { [key]: spotCache[key] };
+    // LRU eviction: drop the oldest entry, never nuke the whole cache.
+    const keys = Object.keys(spotCache);
+    if (keys.length > 50) {
+      const oldest = keys.sort((a, b) => spotCache[a].at - spotCache[b].at)[0];
+      delete spotCache[oldest];
+    }
     return spot;
   } catch (e) {
-    return fail(`spot fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+    return fail(`spot parse failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -741,16 +855,15 @@ export async function fetchSpot(code: string): Promise<Spot & { stale?: boolean 
 export type FilingInfo = { form: string; date: string; url: string } | null;
 
 export async function fetchLatestFilings(cik: string): Promise<{ k10: FilingInfo; q10: FilingInfo; error?: string }> {
+  if (!/^\d{1,10}$/.test(cik)) return { k10: null, q10: null, error: "invalid CIK for filings lookup" };
   const padded = cik.padStart(10, "0");
   const url = `https://data.sec.gov/submissions/CIK${padded}.json`;
+  const out = await fetchJsonCapped(url, {
+    "User-Agent": "uzam-mvp/0.1 (+research)", Accept: "application/json",
+  });
+  if (out.error || !out.json) return { k10: null, q10: null, error: `SEC ${out.error ?? "unknown"}` };
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "uzam-mvp/0.1 (+research)", "Accept": "application/json" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return { k10: null, q10: null, error: `SEC HTTP ${res.status}` };
-    const json = (await res.json()) as AnyObj;
-    const recent = json?.filings?.recent;
+    const recent = out.json?.filings?.recent;
     if (!recent || !Array.isArray(recent.form)) return { k10: null, q10: null, error: "SEC response unparseable" };
     const pick = (form: string): FilingInfo => {
       const i = (recent.form as unknown[]).findIndex((f) => f === form);
@@ -762,19 +875,18 @@ export async function fetchLatestFilings(cik: string): Promise<{ k10: FilingInfo
     };
     return { k10: pick("10-K"), q10: pick("10-Q") };
   } catch (e) {
-    return { k10: null, q10: null, error: `SEC fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+    return { k10: null, q10: null, error: `SEC parse failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
 export async function fetchDividend(code: string): Promise<{ amount: string | null; date: string | null; error?: string }> {
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(code)) return { amount: null, date: null, error: "invalid ticker for dividend lookup" };
+  const out = await fetchJsonCapped(`https://query1.finance.yahoo.com/v8/finance/chart/${code}?range=1y&interval=1mo&events=div`, {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+  });
+  if (out.error || !out.json) return { amount: null, date: null, error: `dividend ${out.error ?? "unknown"}` };
   try {
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${code}?range=1y&interval=1mo&events=div`, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return { amount: null, date: null, error: `dividend HTTP ${res.status}` };
-    const json = (await res.json()) as AnyObj;
-    const divs = json?.chart?.result?.[0]?.events?.dividends;
+    const divs = out.json?.chart?.result?.[0]?.events?.dividends;
     if (!divs || typeof divs !== "object") return { amount: null, date: null };
     const entries = Object.values(divs as Record<string, AnyObj>);
     if (entries.length === 0) return { amount: null, date: null };
@@ -785,12 +897,13 @@ export async function fetchDividend(code: string): Promise<{ amount: string | nu
       date: last.date ? new Date(Number(last.date) * 1000).toISOString().slice(0, 10) : null,
     };
   } catch (e) {
-    return { amount: null, date: null, error: `dividend fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+    return { amount: null, date: null, error: `dividend parse failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
 // Nasdaq hours in America/New_York: Mon–Fri 09:30–16:00. Else closed.
-export function marketStatus(at = new Date()): "open" | "closed" {
+// "unknown" on formatter failure — never mislabel a bug as a closed market.
+export function marketStatus(at = new Date()): "open" | "closed" | "unknown" {
   try {
     const fmt = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false,
@@ -801,7 +914,7 @@ export function marketStatus(at = new Date()): "open" | "closed" {
     const mins = Number(parts.hour) * 60 + Number(parts.minute);
     return mins >= 570 && mins < 960 ? "open" : "closed";
   } catch {
-    return "closed";
+    return "unknown";
   }
 }
 
@@ -821,7 +934,7 @@ export function summarizeResearch(r: AnyObj): string {
   const prem = r.economics?.premium_discount_bps;
   const premTxt = prem === null || prem === undefined
     ? "premium n/a (no underlying reference)"
-    : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : "open"} reference`;
+    : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : r.economics?.underlying_market_status === "unknown" ? "UNKNOWN-STATE" : "open"} reference`;
   lines.push(`> Token **${ta.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
   lines.push(`> ${L("lbl_holders")} **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · ${L("lbl_liquidity")} **${fmtNum(ta.liquidity) ?? "n/a"}**`);
   lines.push(`> ${L("lbl_backing")}: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
@@ -913,7 +1026,7 @@ export function summarizeResearch(r: AnyObj): string {
   for (const n of recent) lines.push(`- [${n.title}](${n.url ?? "#"}) (${n.source ?? "news"}${n.published_at ? `, ${n.published_at}` : ""})`);
   const contra = (r.contradictions as AnyObj[]) ?? [];
   lines.push(`### ${L("sec_contradictions")}`);
-  if (contra.length === 0) lines.push(`- No contradictions in the 3 automated checks (underlying code, OKX price drift >10%, tokenlist symbol). Limited coverage — see unknowns.`);
+  if (contra.length === 0) lines.push(`- No contradictions in the 4 automated checks (underlying code, OKX price drift >10%, tokenlist symbol, issuer-contract crosscheck). Limited coverage — see unknowns.`);
   for (const c of contra) lines.push(`- CONFLICT: ${c.issue} See: ${c.recommended_action}`);
   // Methodology: what was consulted, so the report is auditable.
   lines.push(`### ${L("sec_method")}`);
@@ -924,6 +1037,7 @@ export function summarizeResearch(r: AnyObj): string {
   lines.push(`- Independent tokenlist (chain 196): ${r.onchain.tokenlist_check?.listed ? `confirms contract as ${r.onchain.tokenlist_check.matched_symbol}` : "contract not confirmed"}`);
   lines.push(`- Underlying spot: ${r.economics?.underlying_source ?? "unavailable"}${r.economics?.reference_price_timestamp ? ` (${r.economics.reference_price_timestamp})` : ""}`);
   lines.push(`- Grades capped by design: issuer claims alone can never exceed MEDIUM; HIGH needs multi-source agreement + tokenlist confirmation + zero contradictions.`);
+  lines.push(`- ${L("data_notice")}`);
   return lines.join("\n");
 }
 
@@ -946,16 +1060,21 @@ function confidenceReceipt(r: AnyObj): string {
 }
 
 export function summarizeCompare(c: AnyObj): string {
-  if (!c.rows || c.rows.length === 0) return `**No assets compared.** ${c.error ?? ""}`;
+  if (!c.rows || c.rows.length === 0) {
+    const nf = ((c.not_found as string[] | undefined) ?? []);
+    const sup = ((c.supported_symbols as string[] | undefined) ?? []).join(", ");
+    return `**No assets compared.** ${c.error ?? ""}${nf.length > 0 ? ` Not found: ${nf.join(", ")}.` : ""}${sup ? ` Supported: ${sup}.` : ""}`;
+  }
   const lang = normalizeLang(c.lang);
   const L = (k: string): string => t(lang, k);
   const lines: string[] = [];
   lines.push(`## ${L("cmp_title")}: ${(c.compared as string[]).join(" vs ")}`);
   lines.push(`| Asset | Price | Premium | Holders | Top 10 | Liquidity | Backing | Overall |`);
   lines.push(`|---|---|---|---|---|---|---|---|`);
+  const cellPct = (v: unknown): string => (v === null || v === undefined ? "n/a" : `${v}%`);
   for (const r of c.rows as AnyObj[]) {
     const prem = r.premium_discount_bps === null || r.premium_discount_bps === undefined ? "n/a" : `${r.premium_discount_bps >= 0 ? "+" : ""}${r.premium_discount_bps}bps`;
-    lines.push(`| ${r.symbol} | ${r.price ?? "n/a"} | ${prem} | ${r.holders ?? "n/a"} | ${r.top10HoldPercent ?? "n/a"}% | ${r.liquidity ?? "n/a"} | ${r.backing_confidence} | ${r.overall_confidence} |`);
+    lines.push(`| ${r.symbol} | ${r.price ?? "n/a"} | ${prem} | ${r.holders ?? "n/a"} | ${cellPct(r.top10HoldPercent)} | ${r.liquidity ?? "n/a"} | ${r.backing_confidence} | ${r.overall_confidence} |`);
   }
   // Deltas in plain English — the "can't get this from raw OKX" moment.
   const rows = c.rows as AnyObj[];
@@ -970,7 +1089,9 @@ export function summarizeCompare(c: AnyObj): string {
     const withLiq = rows.filter((r) => hasNum(r.liquidity));
     if (withLiq.length > 1) {
       const sorted = [...withLiq].sort((a, b) => Number(b.liquidity) - Number(a.liquidity));
-      lines.push(`- ${L("cmp_liquid")}: ${sorted[0].symbol} (${sorted[0].liquidity}) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].liquidity}, ${(Number(sorted[0].liquidity) / Math.max(1, Number(sorted[sorted.length - 1].liquidity))).toFixed(1)}x).`);
+      const lo = Number(sorted[sorted.length - 1].liquidity);
+      const ratio = lo > 0 ? `${(Number(sorted[0].liquidity) / lo).toFixed(1)}x` : "n/a (zero baseline)";
+      lines.push(`- ${L("cmp_liquid")}: ${sorted[0].symbol} (${sorted[0].liquidity}) vs ${sorted[sorted.length - 1].symbol} (${sorted[sorted.length - 1].liquidity}, ${ratio}).`);
     }
     const withConc = rows.filter((r) => hasNum(r.top10HoldPercent));
     if (withConc.length > 1) {
@@ -985,7 +1106,8 @@ export function summarizeCompare(c: AnyObj): string {
   if (withRange.length > 0) {
     lines.push(`### ${L("sec_activity")}`);
     for (const r of withRange) {
-      lines.push(`- ${r.symbol} 30d: low **${r.range_30d.low}** / high **${r.range_30d.high}** (${r.range_30d.change_pct ?? "n/a"}% change) · turnover **${r.turnover_24h ?? "n/a"}x**.`);
+      const to = r.turnover_24h === null || r.turnover_24h === undefined ? "n/a" : `${r.turnover_24h}x`;
+      lines.push(`- ${r.symbol} 30d: low **${r.range_30d.low}** / high **${r.range_30d.high}** (${r.range_30d.change_pct ?? "n/a"}% change) · turnover **${to}**.`);
     }
   }
   const shared = ((c.shared_holders as AnyObj[] | undefined) ?? []).slice(0, 3);
@@ -995,6 +1117,8 @@ export function summarizeCompare(c: AnyObj): string {
   }
   const nf = ((c.not_found as string[] | undefined) ?? []);
   if (nf.length > 0) lines.push(`Not found: ${nf.join(", ")}.`);
+  if (typeof c.duplicates_dropped === "number" && c.duplicates_dropped > 0) lines.push(`Note: ${c.duplicates_dropped} duplicate input(s) collapsed.`);
+  if (Array.isArray(c.dropped_symbols) && c.dropped_symbols.length > 0) lines.push(`${c.dropped_note ?? `Ignored: ${c.dropped_symbols.join(", ")}.`}`);
   return lines.join("\n");
 }
 
@@ -1003,23 +1127,28 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   const t0 = Date.now();
   const lang = normalizeLang(opts?.lang);
   const L = (k: string): string => t(lang, k);
+  const fallbackNote = langFallbackNote(opts?.lang, lang);
   const clean = symbol.trim().toUpperCase();
   const asset = findAsset(clean);
   if (!asset) {
     return {
       found: false, symbol: clean, lang,
+      ...(fallbackNote ? { lang_note: fallbackNote } : {}),
       uncertainty: L("id_unknown"),
       supported_symbols: supportedSymbols(), confidence: "UNKNOWN", data_timestamp: now(),
     };
   }
   if (focus === "issuer") {
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
     return {
       found: true, focus, lang,
+      ...(fallbackNote ? { lang_note: fallbackNote } : {}),
       asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
       issuer: { name: asset.issuer, legal: asset.issuer_legal ?? null, website: asset.official_website, documents: asset.official_documents },
       underlying: { exposure: asset.underlying_asset, ...(asset.underlying ?? {}) },
       note: "Issuer focus: identity only, no onchain or document fetches performed.",
       confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: "UNKNOWN" },
+      receipt: `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · 0/7 ${L("rpt_endpoints")} + 0 ${L("rpt_pages")} + identity only ${L("rpt_in")} ${secs}s · data ${now()}`,
       data_timestamp: now(),
     };
   }
@@ -1029,48 +1158,87 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     skipOnchain ? onchainStub : gatherOnchain(clean, asset),
     gatherBacking(asset),
   ]);
-  const recent = focus === "full" || focus === "risks" ? await gatherRecent(asset) : { items: [], note: "Skipped by focus." };
-  const contradictions = detectContradictions(asset, onchain);
-  const risks = buildRisks(onchain, backing);
   const econ = onchain.trading_activity ?? {};
   // Underlying spot + premium/discount (needs a token price; skipped otherwise).
   // Prefer the registry's explicit ticker; fall back to parsing the old string.
   const underlyingCode = (asset.underlying?.ticker ?? asset.underlying_asset.split(/[\s(]/)[0]).toUpperCase();
   const isEtf = asset.asset_type === "tokenized_etf";
-  let spot: { price: number | null; date: string | null; time: string | null; error?: string } = { price: null, date: null, time: null };
-  let premiumBps: number | null = null;
-  let mktStatus: "open" | "closed" = "closed";
   const tokenPx = Number(econ.price_raw ?? econ.price);
   const codeOk = /^[A-Z][A-Z.]{0,9}$/.test(underlyingCode);
-  if (Number.isFinite(tokenPx) && tokenPx > 0 && codeOk && focus !== "risks") {
-    spot = await fetchSpot(underlyingCode);
-    mktStatus = marketStatus();
-    if (spot.price) premiumBps = Math.round(((tokenPx - spot.price) / spot.price) * 10000);
-  }
-  // SEC filings (stocks only; ETFs link the issuer page instead) + dividends.
+  type Spot = { price: number | null; date: string | null; time: string | null; stale?: boolean; error?: string };
+  // Enrichment stages are independent once tokenPx is known — run together.
+  // Each is guarded: a throw becomes an unknowns entry, never a lost report.
+  const wantRecent = focus === "full" || focus === "risks";
+  const wantSpot = Number.isFinite(tokenPx) && tokenPx > 0 && codeOk && focus !== "risks";
+  const wantFilings = focus !== "risks" && !isEtf && !!asset.underlying?.cik;
+  const wantDividend = wantFilings && codeOk;
+  const [recentRes, spotRes, filRes, divRes] = await Promise.all([
+    (async (): Promise<{ items: AnyObj[]; note: string }> => {
+      if (!wantRecent) return { items: [], note: "Skipped by focus." };
+      try {
+        return await gatherRecent(asset);
+      } catch (e) {
+        return { items: [], note: `Skipped: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    })(),
+    (async (): Promise<Spot> => {
+      if (!wantSpot) return { price: null, date: null, time: null };
+      try {
+        return await fetchSpot(underlyingCode);
+      } catch {
+        return { price: null, date: null, time: null, error: "spot fetch threw" };
+      }
+    })(),
+    (async (): Promise<{ k10: FilingInfo; q10: FilingInfo; error?: string }> => {
+      if (!wantFilings) return { k10: null, q10: null };
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return await fetchLatestFilings(asset.underlying!.cik!);
+      } catch {
+        return { k10: null, q10: null, error: "filings fetch threw" };
+      }
+    })(),
+    (async (): Promise<{ amount: string | null; date: string | null; error?: string }> => {
+      if (!wantDividend) return { amount: null, date: null };
+      try {
+        return await fetchDividend(underlyingCode);
+      } catch {
+        return { amount: null, date: null, error: "dividend fetch threw" };
+      }
+    })(),
+  ]);
+  const recent = recentRes;
+  const spot: Spot = spotRes;
+  let premiumBps: number | null = null;
+  let mktStatus: "open" | "closed" | "unknown" = marketStatus();
+  if (spot.price) premiumBps = Math.round(((tokenPx - spot.price) / spot.price) * 10000);
+  // SEC filings (stocks only; ETFs link the holdings page instead) + dividends.
   let filings: AnyObj = { skipped: true };
   let dividend: AnyObj = { skipped: true };
   const cik = asset.underlying?.cik ?? null;
-  if (focus !== "risks" && !isEtf && cik) {
-    const { k10, q10, error } = await fetchLatestFilings(cik);
+  if (wantFilings) {
+    const { k10, q10, error } = filRes;
     filings = { cik, latest_10k: k10, latest_10q: q10, filings_url: asset.underlying?.sec_filings ?? null, ...(error ? { error } : {}) };
-    const div = await fetchDividend(underlyingCode);
     dividend = {
-      underlying_last_amount: div.amount, underlying_last_date: div.date,
-      ...(div.error ? { error: div.error } : {}),
+      underlying_last_amount: divRes.amount, underlying_last_date: divRes.date,
+      ...(divRes.error ? { error: divRes.error } : {}),
       xstock_treatment: "UNKNOWN — whether this xStock passes through dividends must be confirmed in the issuer's Final Terms.",
     };
   } else if (isEtf) {
     filings = { note: "ETF underlying — no single-company 10-K. See holdings page.", holdings_url: asset.underlying?.sec_filings ?? null };
   }
-  const tlListed = onchain.tokenlist_check?.listed === true;
+  const contradictions = detectContradictions(asset, onchain);
+  const risks = buildRisks(onchain, backing);
+  const tlListed = onchain.tokenlist_check?.listed === true && onchain.tokenlist_check?.stale !== true;
   const unknowns: string[] = [
     ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions.filter((q) => tlListed ? !/No independent.*verification/i.test(String(q)) : true) : []),
     ...(Array.isArray(onchain.missing) && onchain.missing.length > 0 ? [`Onchain gaps: ${onchain.missing.join("; ")}`] : []),
     ...(tokenPx > 0 && !codeOk ? [`Premium skipped: underlying code "${underlyingCode}" is not a plain ticker.`] : []),
   ];
   if (premiumBps !== null && mktStatus === "closed") unknowns.push(`Premium/discount (${premiumBps} bps) is measured against a stale reference — Nasdaq was closed at check time (${spot.date ?? ""} ${spot.time ?? ""}).`);
+  if (premiumBps !== null && mktStatus === "unknown") unknowns.push(`Premium/discount (${premiumBps} bps) reference freshness unknown — market-hours check failed, treat as potentially stale.`);
   if (spot.error && tokenPx > 0) unknowns.push(`Underlying spot unavailable: ${spot.error}. No premium computed.`);
+  if (spot.stale && spot.price) unknowns.push(`Underlying spot is STALE (cached ${spot.date ?? ""} ${spot.time ?? ""}) — premium computed against it, re-check before use.`);
   if (filings.error) unknowns.push(`SEC filings unavailable: ${filings.error}.`);
   if (!filings.skipped && !filings.latest_10k && !filings.latest_10q && !filings.error && !filings.note) unknowns.push("No 10-K/10-Q found in recent SEC submissions.");
   if (dividend.error) unknowns.push(`Underlying dividend history unavailable: ${dividend.error}.`);
@@ -1082,32 +1250,40 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   if (attestLinks.length === 0 && !backingQs.some((q) => /attest/i.test(String(q)))) {
     unknowns.push("No reserve attestation or proof-of-reserves link found on fetched pages.");
   }
+  // Explorer record is chain data (the contract exists on X Layer), not a
+  // market quote — Tier 1, but MEDIUM: an explorer is a view of the chain,
+  // not a direct chain read.
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
-    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "market_data" as SourceType, tier: 2, confidence: "MEDIUM", retrieved_at: now() }] : []),
+    ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "MEDIUM", retrieved_at: now() }] : []),
     ...(Array.isArray(onchain.extra_evidence) ? onchain.extra_evidence : []),
   ];
   // SEC filings as Tier-1 legal evidence (underlying company, not the token).
+  // Confidence MEDIUM per itemConfidence: a filing proves the underlying's
+  // financials, never the token's backing.
   for (const f of [filings.latest_10k, filings.latest_10q]) {
     if (f) {
       evidence.push({
         claim: `Underlying ${underlyingCode} filed ${f.form} on ${f.date} (SEC EDGAR).`,
         source_title: `SEC EDGAR ${f.form}`, source_url: f.url,
         excerpt: `${underlyingCode} ${f.form} filed ${f.date} — primary source for the underlying company's financials.`,
-        basis: "fact", source_type: "legal_document" as SourceType, tier: 1, confidence: "HIGH", retrieved_at: now(),
+        basis: "fact", source_type: "legal_document" as SourceType, tier: 1, confidence: itemConfidence("legal_document"), retrieved_at: now(),
       });
     }
   }
-  // HIGH means: multiple OKX endpoints agree + docs present + independent
-  // tokenlist confirms the contract + no contradictions. Issuer claims alone
-  // can never produce HIGH, and neither can a single data source.
+  // HIGH means: at least 4 of 7 OKX endpoints agree + docs present +
+  // independent tokenlist confirms the contract (fresh, not stale) + no
+  // contradictions. Issuer claims alone can never produce HIGH, and neither
+  // can a thin or stale source set.
+  const covGate = okxCoverage(Array.isArray(onchain.missing) ? onchain.missing : []);
   const overall =
     onchain.onchain === null ? "LOW"
-    : onchain.confidence === "HIGH" && backing.confidence !== "UNKNOWN" && tlListed && contradictions.length === 0 ? "HIGH"
+    : covGate.ok >= 4 && onchain.confidence !== "LOW" && backing.confidence !== "UNKNOWN" && tlListed && contradictions.length === 0 ? "HIGH"
     : backing.confidence === "UNKNOWN" && onchain.confidence === "LOW" ? "LOW"
     : "MEDIUM";
   const report: AnyObj = {
     found: true, focus, lang,
+    ...(fallbackNote ? { lang_note: fallbackNote } : {}),
     asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
     issuer: { name: asset.issuer, legal: asset.issuer_legal ?? null, website: asset.official_website, documents: asset.official_documents },
     underlying: { exposure: asset.underlying_asset, ...(asset.underlying ?? {}) },
@@ -1130,11 +1306,12 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       dividend,
     },
     economics: {
-      price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? {},
+      price: econ.price ?? null, marketCap: econ.marketCap ?? null, liquidity: econ.liquidity ?? null, supply: onchain.supply ?? null,
       turnover_24h: econ.turnover_24h ?? null, liquidity_to_mcap: econ.liquidity_to_mcap ?? null, avg_trade_size: econ.avg_trade_size ?? null,
       range_30d: onchain.price_history ?? null,
       underlying_price: spot.price !== null ? spot.price.toFixed(2) : null,
       underlying_source: spot.price !== null ? "Yahoo Finance quote (unverified third party)" : null,
+      ...(spot.stale ? { spot_stale: true } : {}),
       premium_discount_bps: premiumBps,
       underlying_market_status: spot.price !== null ? mktStatus : null,
       reference_price_timestamp: spot.date ? `${spot.date} ${spot.time ?? ""}`.trim() : null,
@@ -1145,7 +1322,9 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       price_history: onchain.price_history ?? null,
       recent_trades: onchain.recent_trades ?? null,
       pools: onchain.pools ?? null,
+      token_meta: onchain.token_meta ?? null,
       tokenlist_check: onchain.tokenlist_check ?? null,
+      contract_crosscheck: onchain.contract_crosscheck ?? null,
       observations: onchain.observations ?? [], missing: onchain.missing ?? [],
     },
     risks,
@@ -1156,18 +1335,31 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     confidence: { overall, identity: "HIGH", onchain: onchain.confidence ?? "UNKNOWN", backing: backing.confidence ?? "UNKNOWN" },
     data_timestamp: now(),
   };
-  // Receipt footer: prove the work. Sources counted from what actually ran.
+  // Receipt: prove the work — segments appear only for sources that ran.
   const missingList: string[] = Array.isArray(onchain.missing) ? onchain.missing : [];
   const cov = okxCoverage(missingList);
   const pages = Array.isArray(backing.pages_read) ? backing.pages_read.length : 0;
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  report.receipt = `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · ${cov.ok}/${cov.total} ${L("rpt_endpoints")} + ${pages} ${L("rpt_pages")} + tokenlist + spot + news ${L("rpt_in")} ${secs}s · data ${report.data_timestamp}`;
+  const ranTokenlist = onchain.tokenlist_check?.checked === true;
+  const ranSpot = spot.price !== null || spot.error !== undefined;
+  const ranNews = focus === "full" || focus === "risks";
+  const segs = [
+    `${cov.ok}/${cov.total} ${L("rpt_endpoints")}`,
+    `${pages} ${L("rpt_pages")}`,
+    ...(ranTokenlist ? ["tokenlist"] : []),
+    ...(ranSpot ? ["spot"] : []),
+    ...(ranNews ? ["news"] : []),
+  ];
+  report.receipt = `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · ${segs.join(" + ")} ${L("rpt_in")} ${secs}s · data ${report.data_timestamp}`;
   report.summary = summarizeResearch(report);
   if (focus === "risks") {
     return {
-      found: true, focus, asset: report.asset,
+      found: true, focus, lang,
+      ...(fallbackNote ? { lang_note: fallbackNote } : {}),
+      asset: report.asset,
       risks: report.risks, unknowns: report.unknowns, confidence: report.confidence,
       summary: `## ${report.asset.symbol} — top risks\n` + (report.risks as Risk[]).map((x) => `- **${x.category}** (${x.severity}): ${x.reason}`).join("\n"),
+      receipt: report.receipt,
       note: "Risks focus: full data gathered, only risk sections returned.",
       data_timestamp: report.data_timestamp,
     };
@@ -1182,20 +1374,25 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
   const t0 = Date.now();
   const lang = normalizeLang(opts?.lang);
   const L = (k: string): string => t(lang, k);
-  const requested = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+  const fallbackNote = langFallbackNote(opts?.lang, lang);
+  const rawList = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const requested = [...new Set(rawList)];
+  const duplicates_dropped = rawList.length - requested.length;
   const dropped = requested.slice(4);
   const list = requested.slice(0, 4);
   if (list.length === 0) {
     return { compared: [], error: "Provide 1-4 symbols, e.g. [\"AAPLx\", \"TSLAx\"].", supported_symbols: supportedSymbols() };
   }
-  const reports: AnyObj[] = [];
-  for (const s of list) {
-    try {
-      reports.push(await researchAsset(s, "full", { lang }));
-    } catch (e) {
-      reports.push({ found: false, symbol: s, error: `research failed: ${e instanceof Error ? e.message : String(e)}`, data_timestamp: now() });
-    }
-  }
+  // Parallel: independent reports share nothing except read-only caches.
+  const reports: AnyObj[] = await Promise.all(
+    list.map(async (s) => {
+      try {
+        return await researchAsset(s, "full", { lang });
+      } catch (e) {
+        return { found: false, symbol: s, error: `research failed: ${e instanceof Error ? e.message : String(e)}`, data_timestamp: now() };
+      }
+    })
+  );
   const found = reports.filter((r) => r.found === true);
   const notFound = reports.filter((r) => r.found !== true).map((r) => r.symbol);
   const rows = found.map((r) => ({
@@ -1223,13 +1420,20 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
       leaders.push({ category: "backing_evidence", leader: null, reason: `Tie — every compared asset scores ${rows[0].backing_confidence} with ${rows[0].evidence_count} evidence items. No leader; documentation depth is identical.` });
     } else {
       const byEvidence = [...rows].sort((a, b) => (CONF_RANK[String(b.backing_confidence)] - CONF_RANK[String(a.backing_confidence)]) || (b.evidence_count - a.evidence_count));
-      leaders.push({ category: "backing_evidence", leader: byEvidence[0].symbol, reason: `${byEvidence[0].symbol} has backing confidence ${byEvidence[0].backing_confidence} with ${byEvidence[0].evidence_count} evidence items vs ${byEvidence.slice(1).map((r) => `${r.symbol} (${r.backing_confidence}, ${r.evidence_count})`).join(", ")}. Stronger here means better-documented, not safer.` });
+      const topConf = CONF_RANK[String(byEvidence[0].backing_confidence)];
+      const topCount = byEvidence[0].evidence_count;
+      const tiedTop = byEvidence.filter((r) => CONF_RANK[String(r.backing_confidence)] === topConf && r.evidence_count === topCount);
+      if (tiedTop.length > 1) {
+        leaders.push({ category: "backing_evidence", leader: null, reason: `Tie at the top — ${tiedTop.map((r) => r.symbol).join(", ")} each score ${byEvidence[0].backing_confidence} with ${topCount} evidence items. No single leader.` });
+      } else {
+        leaders.push({ category: "backing_evidence", leader: byEvidence[0].symbol, reason: `${byEvidence[0].symbol} has backing confidence ${byEvidence[0].backing_confidence} with ${byEvidence[0].evidence_count} evidence items vs ${byEvidence.slice(1).map((r) => `${r.symbol} (${r.backing_confidence}, ${r.evidence_count})`).join(", ")}. Stronger here means better-documented, not safer.` });
+      }
     }
     const withLiq = rows.filter((r) => hasNum(r.liquidity));
     if (withLiq.length > 1) {
       const byLiq = [...withLiq].sort((a, b) => Number(b.liquidity) - Number(a.liquidity));
-      if (Number(byLiq[0].liquidity) === Number(byLiq[1].liquidity)) {
-        leaders.push({ category: "liquidity", leader: null, reason: `Tie — top liquidities identical (${byLiq[0].liquidity}). No leader.` });
+      if (new Set(byLiq.map((r) => Number(r.liquidity))).size === 1) {
+        leaders.push({ category: "liquidity", leader: null, reason: `Tie — all observed liquidities identical (${byLiq[0].liquidity}). No leader.` });
       } else {
         const withTurn = rows.filter((r) => hasNum(r.turnover_24h));
         const turnBest = withTurn.length > 0 ? [...withTurn].sort((a, b) => Number(b.turnover_24h) - Number(a.turnover_24h))[0] : null;
@@ -1241,7 +1445,11 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
       const sorted10 = [...withConc].sort((a, b) => Number(a.top10HoldPercent) - Number(b.top10HoldPercent));
       const withTop3 = rows.filter((r) => hasNum(r.top3Percent));
       if (withTop3.length <= 1) {
-        leaders.push({ category: "holder_dispersion", leader: sorted10[0].symbol, reason: `${sorted10[0].symbol} is least concentrated by top-10 (${sorted10[0].top10HoldPercent}%). Top-3 slice unavailable — leader from top-10 only.` });
+        if (new Set(sorted10.map((r) => Number(r.top10HoldPercent))).size === 1) {
+          leaders.push({ category: "holder_dispersion", leader: null, reason: "Tie on top-10 concentration across all compared assets. No leader." });
+        } else {
+          leaders.push({ category: "holder_dispersion", leader: sorted10[0].symbol, reason: `${sorted10[0].symbol} is least concentrated by top-10 (${sorted10[0].top10HoldPercent}%). Top-3 slice unavailable — leader from top-10 only.` });
+        }
       } else {
         const sorted3 = [...withTop3].sort((a, b) => Number(a.top3Percent) - Number(b.top3Percent));
         const by10 = sorted10[0].symbol;
@@ -1260,23 +1468,28 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
   }
   // Whale recurrence: top-holder addresses appearing across several tokens.
   // Pattern is consistent with issuer/venue wallets — identities NOT verified.
-  const addrMap: Record<string, { symbols: string[]; maxPercent: number }> = {};
+  // Map (not a plain object): holder addresses are attacker-influenced keys
+  // and "__proto__" must never repoint a prototype.
+  const addrMap = new Map<string, { symbols: string[]; maxPercent: number }>();
   for (const r of rows) {
     for (const h of ((r.top_holders as AnyObj[] | undefined) ?? [])) {
       const a = String(h.address ?? "");
-      if (!a) continue;
-      const cur = addrMap[a] ?? { symbols: [], maxPercent: 0 };
+      if (!/^0x[0-9a-fA-F]{40}$/.test(a)) continue;
+      const cur = addrMap.get(a) ?? { symbols: [], maxPercent: 0 };
       if (!cur.symbols.includes(r.symbol)) cur.symbols.push(r.symbol);
-      cur.maxPercent = Math.max(cur.maxPercent, Number(h.percent) || 0);
-      addrMap[a] = cur;
+      const n = Number(h.percent);
+      if (Number.isFinite(n)) cur.maxPercent = Math.max(cur.maxPercent, n);
+      addrMap.set(a, cur);
     }
   }
-  const shared_holders = Object.entries(addrMap)
+  const shared_holders = [...addrMap.entries()]
     .filter(([, v]) => v.symbols.length > 1)
     .map(([address, v]) => ({ address, tokens: v.symbols, max_percent: Number(v.maxPercent.toFixed(2)), note: "Recurs as a top holder across tokens — pattern consistent with issuer/venue wallets. Identity NOT verified; do not treat as fact." }))
     .sort((a, b) => b.tokens.length - a.tokens.length || b.max_percent - a.max_percent);
   const out: AnyObj = {
     compared: rows.map((r) => r.symbol), rows, leaders, shared_holders, lang,
+    ...(fallbackNote ? { lang_note: fallbackNote } : {}),
+    ...(duplicates_dropped > 0 ? { duplicates_dropped, duplicates_note: `${duplicates_dropped} duplicate input(s) collapsed (case-insensitive).` } : {}),
     ...(dropped.length > 0 ? { dropped_symbols: dropped, dropped_note: `Only the first 4 were compared; ignored: ${dropped.join(", ")}.` } : {}),
     not_found: notFound, supported_symbols: supportedSymbols(),
     note: "Leaders are per-category and evidence-based. A leader in one category is not an overall recommendation.",

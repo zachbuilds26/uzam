@@ -83,18 +83,50 @@ async function signedFetch(
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
-    return { ok: false, status: 0, error: `network error: ${e instanceof Error ? e.message : String(e)}` };
+    // One retry for transient network failures only (never for 4xx/auth).
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      res = await fetch(`${BASE}${requestPath}`, {
+        method,
+        headers,
+        body: method === "POST" ? body : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e2) {
+      return { ok: false, status: 0, error: `network error: ${e2 instanceof Error ? e2.message : String(e2)}` };
+    }
+    void e;
+  }
+  // Cap the body before parsing: an authed endpoint returning an error page
+  // must not buffer unbounded bytes. 1 MB is far above any market payload.
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    return { ok: false, status: res.status, error: `unreadable response (HTTP ${res.status})` };
+  }
+  if (text.length > 1_000_000) {
+    return { ok: false, status: res.status, error: `response too large (${text.length} chars)` };
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let json: any = null;
   try {
-    json = await res.json();
+    json = JSON.parse(text);
   } catch {
     return { ok: false, status: res.status, error: `non-JSON response (HTTP ${res.status})` };
   }
-  if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}: code ${json?.code ?? "?"} ${json?.msg ?? "unknown"}` };
+  if (!res.ok) {
+    const msg = String(json?.msg ?? "unknown").slice(0, 200);
+    const code = json?.code ?? "?";
+    const clockHint =
+      res.status === 401 ? " (if persistent, check server clock/NTP — skewed timestamps fail auth)" : "";
+    return { ok: false, status: res.status, error: `HTTP ${res.status}: code ${code} ${msg}${clockHint}` };
+  }
   if (json && String(json.code) !== "0") {
-    return { ok: false, status: res.status, error: `OKX code ${json.code}: ${json.msg ?? "unknown"}` };
+    // 429 / 50011 = rate limit: surface immediately (no retry loop — the
+    // caller records missing[] and degrades instead of hammering quota).
+    const msg = String(json.msg ?? "unknown").slice(0, 200);
+    return { ok: false, status: res.status, error: `OKX code ${json.code}: ${msg}` };
   }
   if (json == null || json.data === undefined) {
     return { ok: false, status: res.status, error: "missing data field in OKX response" };

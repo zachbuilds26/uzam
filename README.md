@@ -10,6 +10,17 @@ and calls research tools. Uzam gathers and cites — the agent reasons.
 - **Hackathon:** OKX Dev Day 2026 — primary track OKX AI (Agents), secondary X Layer RWA
 - **Assets:** xStocks tokenized equities on X Layer (chain 196): AAPLx, TSLAx, NVDAx, SPYx, GOOGLx, MSFTx, AMZNx, METAx, NFLXx, AMDx, COINx, HOODx, AVGOx, JPMx, Vx, PLTRx
 
+## Paid REST API (x402, USDT0 on X Layer)
+
+| Route | Price | What it does |
+|---|---|---|
+| `POST /api/identify` | $0.15 | Name, issuer, underlying, chain, docs + live quote. |
+| `GET /api/research/preview?symbol=AAPLx` | $0.15 | Identity only, zero fetches. |
+| `POST /api/research` | $0.25 | Full dossier (focus: full/issuer/backing/risks, lang: en/zh/es/fr). |
+| `POST /api/compare` | $0.50 | Up to 4 assets, per-category leaders. |
+
+Unpaid calls get `402 Payment Required`. Without `PAY_TO_ADDRESS` + OKX creds the routes run free (never half-enforced). Discovery: `GET /.well-known/x402`, `GET /openapi.json`, `GET /llms.txt`, `GET /install`, `GET /api/receipts`, `GET /info`., NFLXx, AMDx, COINx, HOODx, AVGOx, JPMx, Vx, PLTRx
+
 ## Tools
 
 | Tool | What it does |
@@ -49,7 +60,9 @@ Set `ALLOWED_HOSTS` to your public hostname when deploying (see `render.yaml`).
 
 ## Layout
 
-- `src/server.ts` — MCP tools + HTTP app
+- `src/server.ts` — MCP tools + HTTP app + landing page route
+- `src/site/index.html` — landing page (try-widget, pricing, setup, guardrails)
+- `src/payments/x402.ts` — paid REST routes + x402 paywall + discovery files
 - `src/okx/adapter.ts` — all OKX-specific code lives here only
 - `src/research/provider.ts` — page fetch, passage extraction, source tiers, news RSS
 - `src/research/engines.ts` — backing/onchain gathers, risk engine, contradictions, compare

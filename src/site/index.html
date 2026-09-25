@@ -457,8 +457,6 @@
   setTimeout(function () { splash.remove(); }, 1800);
 })();
 
-var MCP_URL = 'https://uzam-m3pi.onrender.com/mcp';
-
 document.addEventListener('click', function (ev) {
   var btn = ev.target.closest ? ev.target.closest('.copy') : null;
   if (!btn) return;
@@ -502,7 +500,10 @@ document.addEventListener('click', function (ev) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: tool, arguments: args } })
-    }).then(function (res) { return res.text(); }).then(function (text) {
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' — host may be waking, retry shortly.');
+      return res.text();
+    }).then(function (text) {
       var lines = text.split('\n').filter(function (l) { return l.indexOf('data: ') === 0; });
       if (lines.length === 0) throw new Error('No MCP data in response (host may be waking — try again).');
       var msg = JSON.parse(lines[lines.length - 1].slice(6));
