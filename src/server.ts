@@ -139,11 +139,6 @@ const handler = createMcpHandler(() => {
                 official_documents: asset.official_documents,
                 tokenlist_raw: registry.tokenlist_raw ?? null,
                 live: live ?? { available: false, reason: "not_attempted" },
-                related_assets: registry.assets.filter((a) => a.symbol !== asset.symbol).map((a) => a.symbol),
-                next_steps: [
-                  { action: "research_asset", what: "full dossier: backing, premium, holders, risks, filings", price: PRICE_RESEARCH },
-                  { action: "compare_assets", what: "side-by-side with up to 3 more assets", price: PRICE_COMPARE },
-                ],
               },
               null,
               2

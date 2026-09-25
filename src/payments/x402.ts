@@ -158,11 +158,6 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
         chains: asset.chains, chainIds: asset.chainIds,
         official_website: asset.official_website, official_documents: asset.official_documents,
         live,
-        related_assets: supportedSymbols().filter((s) => s !== asset.symbol),
-        next_steps: [
-          { action: "research_asset", what: "full dossier: backing, premium, holders, risks, filings", price: PRICE_RESEARCH },
-          { action: "compare_assets", what: "side-by-side with up to 3 more assets", price: PRICE_COMPARE },
-        ],
       },
     });
   };

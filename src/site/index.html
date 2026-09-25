@@ -599,8 +599,6 @@ document.addEventListener('click', function (ev) {
     if (d.chain_info && d.chain_info.explorer) L.push('Explorer: ' + d.chain_info.explorer);
     L.push('Docs: ' + d.official_website);
     (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
-    if (d.related_assets) L.push('Also covered: ' + d.related_assets.join(', '));
-    (d.next_steps || []).forEach(function (n) { L.push('Next: ' + n.action + ' (' + n.price + ') — ' + n.what); });
     return L.join('\n');
   }
 
