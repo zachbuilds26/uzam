@@ -571,6 +571,14 @@ if (process.env.NODE_ENV === "production" && rawHosts.length === 0) {
 const app = rawHosts.length > 0
   ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: rawHosts, jsonLimit: "1mb" })
   : createMcpExpressApp({ jsonLimit: "1mb" });
+
+app.get("/uzam-logo.png", (_req: Request, res: Response) => {
+  try {
+    res.type("png").send(readFileSync(join(process.cwd(), "src", "site", "uzam-logo.png")));
+  } catch {
+    res.status(404).end();
+  }
+});
 // Behind the Railway proxy: trust the first hop only for scheme/IP.
 // Host validation reads the raw Host header (immune to X-Forwarded-Host).
 app.set("trust proxy", 1);
