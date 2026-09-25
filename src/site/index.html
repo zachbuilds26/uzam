@@ -247,7 +247,6 @@
     <nav class="links" aria-label="Main navigation">
       <a href="#try">Try live</a>
       <a href="#pricing" class="hide-sm">Pricing</a>
-      <a href="#setup" class="hide-sm">Setup</a>
       <a href="https://www.okx.ai/agents/13653">OKX.AI</a>
     </nav>
     <div class="bar-cta">
@@ -276,10 +275,6 @@
         </a>
         <a class="btn" href="https://www.okx.ai/agents/13653">Hire on OKX.AI</a>
       </div>
-      <p class="hero-note">
-        8 xStocks covered: AAPLx · TSLAx · NVDAx · SPYx · GOOGLx · MSFTx · AMZNx · METAx.
-        Answers in English, Chinese, Spanish and French. If the first call is slow, the host is waking — call it twice.
-      </p>
     </div>
   </section>
 
@@ -360,24 +355,6 @@
           <p>Up to 4 assets side by side with per-category leaders, premium deltas and shared-whale flags.</p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ── SETUP ── -->
-  <section class="band" id="setup">
-    <div class="wrap">
-      <div class="band-head center">
-        <p class="kicker">Setup · about 30 seconds</p>
-        <h2>One URL, in whatever you already code in.</h2>
-        <p>Uzam speaks MCP. Point your editor at one address and ask — in English, Chinese, Spanish or French.</p>
-      </div>
-      <div class="tabs" role="tablist" aria-label="Choose your coding agent"></div>
-      <div id="panels"></div>
-      <p class="bridge">
-        Every setup below points at <code>https://uzam-m3pi.onrender.com/mcp</code>.
-        Stdio-only client? Bridge it:
-        <code>npx -y mcp-remote https://uzam-m3pi.onrender.com/mcp</code>.
-      </p>
     </div>
   </section>
 
@@ -473,67 +450,6 @@
 })();
 
 var MCP_URL = 'https://uzam-m3pi.onrender.com/mcp';
-var AGENTS = [
-  {
-    id: 'claude', name: 'Claude Code',
-    note: 'One command, no file to edit.',
-    steps: [
-      ['Add Uzam', 'claude mcp add --transport http uzam ' + MCP_URL],
-      ['Then just ask', 'Use Uzam to research NVDAx (it will ask which language you want)']
-    ]
-  },
-  {
-    id: 'cursor', name: 'Cursor',
-    note: 'Global at ~/.cursor/mcp.json, or .cursor/mcp.json to scope it to one project.',
-    steps: [
-      ['~/.cursor/mcp.json', '{\n  "mcpServers": {\n    "uzam": {\n      "url": "' + MCP_URL + '"\n    }\n  }\n}']
-    ]
-  },
-  {
-    id: 'opencode', name: 'OpenCode',
-    note: 'Global at ~/.config/opencode/opencode.jsonc. Uzam needs a long timeout — full reports take ~20s.',
-    steps: [
-      ['opencode.jsonc', '{\n  "mcp": {\n    "uzam": {\n      "type": "remote",\n      "url": "' + MCP_URL + '",\n      "enabled": true,\n      "timeout": 180000\n    }\n  }\n}']
-    ]
-  }
-];
-
-var tabsEl = document.querySelector('.tabs');
-var panelsEl = document.getElementById('panels');
-var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
-
-AGENTS.forEach(function (a, i) {
-  var tab = document.createElement('button');
-  tab.className = 'tab';
-  tab.type = 'button';
-  tab.id = 'tab-' + a.id;
-  tab.setAttribute('role', 'tab');
-  tab.setAttribute('aria-controls', 'panel-' + a.id);
-  tab.setAttribute('aria-selected', String(i === 0));
-  tab.textContent = a.name;
-  tabsEl.appendChild(tab);
-
-  var panel = document.createElement('div');
-  panel.className = 'panel';
-  panel.id = 'panel-' + a.id;
-  panel.setAttribute('role', 'tabpanel');
-  panel.setAttribute('aria-labelledby', 'tab-' + a.id);
-  panel.hidden = i !== 0;
-  panel.innerHTML =
-    '<h3>' + a.name + '</h3><p class="note">' + a.note + '</p>' +
-    a.steps.map(function (pair) {
-      return '<p class="step-label">' + esc(pair[0]) + '</p><div class="code"><pre class="codeblock">' + esc(pair[1]) +
-        '</pre><button class="copy" type="button">Copy</button></div>';
-    }).join('');
-  panelsEl.appendChild(panel);
-
-  tab.addEventListener('click', function () {
-    var tabs = tabsEl.children;
-    for (var t = 0; t < tabs.length; t++) tabs[t].setAttribute('aria-selected', String(tabs[t] === tab));
-    var panels = panelsEl.children;
-    for (var p = 0; p < panels.length; p++) panels[p].hidden = panels[p] !== panel;
-  });
-});
 
 document.addEventListener('click', function (ev) {
   var btn = ev.target.closest ? ev.target.closest('.copy') : null;
