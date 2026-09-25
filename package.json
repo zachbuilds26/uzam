@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "tsx --test tests/uzam.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "2.0.0",
