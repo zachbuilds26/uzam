@@ -18,6 +18,11 @@ import {
   cutWords,
   buildRisks,
   summarizeCompare,
+  buildIdentity,
+  buildPriceImpact,
+  buildComparisonTable,
+  buildFindings,
+  buildRisksDetailed,
 } from "../src/research/engines.js";
 import { extractPassages, BACKING_KEYWORDS } from "../src/research/provider.js";
 import { normalizeLang, t, sev, langFallbackNote, SUPPORTED_LANGS } from "../src/research/i18n.js";
@@ -212,5 +217,112 @@ describe("langFallbackNote: unsupported languages are announced", () => {
     assert.equal(langFallbackNote("zh", "zh"), null);
     assert.equal(langFallbackNote(undefined, "en"), null);
     assert.equal(langFallbackNote("", "en"), null);
+  });
+});
+
+describe("identify: verification checks, unknowns, no market data", () => {
+  it("returns 5 explicit checks with verified flags", () => {
+    const id = buildIdentity("AAPLx", { lang: "en" });
+    assert.equal(id.service, "identify");
+    assert.equal(id.found, true);
+    assert.equal(id.verification_checks.length, 5);
+    for (const c of id.verification_checks) {
+      assert.equal(typeof c.verified, "boolean");
+      assert.ok(c.detail.length > 0);
+    }
+    assert.ok(id.verification_checks.every((c) => c.verified), "registry AAPLx verifies all 5");
+  });
+  it("leaves standard/decimals/rights unknown, never guessed", () => {
+    const id = buildIdentity("AAPLx", { lang: "en" });
+    assert.equal(id.identity.token_standard, null);
+    assert.equal(id.identity.decimals, null);
+    assert.equal(id.legal_structure.direct_shareholder_rights, null);
+    assert.ok(id.unknown.some((u) => /decimals/i.test(u)));
+    assert.ok(id.unknown.some((u) => /shareholder/i.test(u)));
+    assert.ok(!("live" in id) && !("trading_activity" in id), "no market data in identify");
+  });
+  it("not-found names supported symbols", () => {
+    const id = buildIdentity("ZZZ", { lang: "en" });
+    assert.equal(id.found, false);
+    assert.ok(id.supported_symbols.includes("AAPLx"));
+  });
+});
+
+describe("price impact: calculations labeled, gaps stay unknown", () => {
+  it("estimates $100/$1k/$10k per venue with method stated", () => {
+    const pi = buildPriceImpact({ pools: [{ label: "P1", liquidity_usd: "50000.00" }] });
+    assert.equal(pi.venues[0].estimates.usd_100, "0.20%");
+    assert.equal(pi.venues[0].estimates.usd_10000, "16.67%");
+    assert.ok(pi.assumption.includes("CALCULATION"));
+  });
+  it("no liquidity means no estimate, never zero", () => {
+    const pi = buildPriceImpact(null);
+    assert.deepEqual(pi.venues, []);
+    assert.ok(/unknown/i.test(pi.note));
+  });
+});
+
+describe("dossier: 10 risks, 3-7 findings, side-by-side cells", () => {
+  const base = buildRisks(
+    { holder_concentration: { top10HoldPercent: "30" }, trading_activity: { liquidity_raw: "1000000" }, missing: [] },
+    { confidence: "MEDIUM", unanswered_questions: [], redemption_excerpts: ["x"], pages_read: ["u"], geo_excerpts: ["g"] }
+  );
+  const det = () => buildRisksDetailed({
+    base, underlyingCode: "AAPL", exchange: "NASDAQ", underlyingPrice: "200.00",
+    premiumBps: 50, marketStatus: "open", liquidityRaw: 1000000, venueCount: 2,
+    custodianNamed: false, geoCount: 1, tokenDecimals: null, spotSource: "y",
+    okxOk: 7, okxTotal: 7, redemptionExcerpts: 1,
+  });
+  it("covers all 10 categories with 5 fields each", () => {
+    const cats = det().map((r) => r.category);
+    for (const want of ["underlying_equity", "tracking_pricing", "liquidity", "issuer_counterparty", "custody", "legal_regulatory", "smart_contract", "blockchain_network", "oracle_data", "operational"]) {
+      assert.ok(cats.includes(want), `missing ${want}`);
+    }
+    for (const r of det()) {
+      assert.ok(r.risk.length > 0 && r.current_observation.length > 0 && r.what_it_means.length > 0 && r.unknown_limitation.length > 0);
+    }
+  });
+  it("findings are 3-7 factual lines with evidence refs", () => {
+    const f = buildFindings({
+      symbol: "AAPLx", name: "Apple xStock", checksVerified: 5, checksTotal: 5,
+      tokenPrice: "200.00", underlyingPrice: "199.00", premiumBps: 50, marketStatus: "open", refTs: "t",
+      top10: 30, top5: 20, holders: 100, liquidityRaw: 1000000, venueCount: 2,
+      backingConfidence: "MEDIUM", custodianNamed: false, contradictions: 0, firstContradiction: null,
+      unknowns: ["u1"], evidenceCount: 5,
+    });
+    assert.ok(f.length >= 3 && f.length <= 7);
+    assert.ok(f.every((x) => x.finding.length > 0 && x.evidence_ref.length > 0));
+    assert.ok(!f.some((x) => /safe|good investment|recommend/i.test(x.finding)));
+  });
+  it("comparison table cells carry value, timestamp and source", () => {
+    const table = buildComparisonTable([{
+      asset: { symbol: "AAPLx", name: "Apple xStock", asset_type: "tokenized_stock" },
+      issuer: { name: "xStocks", documents: ["a", "b"] },
+      identity: { identity: { contract_address: "0xabc", underlying_asset: "AAPL" }, legal_structure: {} },
+      backing_detail: { attestation_links: [], custodian: null },
+      onchain_analysis: { supply: { circulating: "10" }, holders_count: 5, top10_percent: 30, top5_percent: 20, transfer_count_24h: 3, tokenlist_check: { listed: true } },
+      liquidity_detail: { venue_count: 1, price_impact: { venues: [{ estimates: { usd_10000: "1.00%" } }] } },
+      economics: { price: "200", liquidity: "50000", volume24H: "1000" },
+      price_relationship: { reference_price: "199", difference_bps: 50 },
+      confidence: { backing: "MEDIUM" },
+      unknowns: ["u1", "u2"],
+      data_timestamp: "2026-01-01T00:00:00.000Z",
+    }]);
+    const cats = new Set(table.map((r) => r.category));
+    for (const want of ["identity", "legal", "backing", "onchain", "liquidity", "price", "documentation", "unknown"]) {
+      assert.ok(cats.has(want), `missing ${want}`);
+    }
+    for (const row of table) {
+      const v = row.values.AAPLx;
+      assert.ok("value" in v && "timestamp" in v && "source" in v);
+      assert.equal(v.timestamp, "2026-01-01T00:00:00.000Z");
+    }
+  });
+  it("new i18n keys exist in every pack", () => {
+    for (const lang of SUPPORTED_LANGS) {
+      for (const k of ["sec_snapshot", "sec_findings", "sec_sources", "lbl_claim", "lbl_verified_fact", "lbl_onchain_obs", "lbl_calc", "id_verified"]) {
+        assert.notEqual(t(lang, k), k, `${lang}:${k}`);
+      }
+    }
   });
 });

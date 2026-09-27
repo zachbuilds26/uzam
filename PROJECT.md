@@ -1,6 +1,6 @@
 # UZAM — RWA Intelligence MCP for AI Agents
 **Folder:** `C:\Users\Emmanuel\uzam`
-**Deploy target:** Render (Web Service, Node 24)
+**Deploy target:** Railway (Node 24, auto-deploy from `master`)
 **Hackathon:** OKX Dev Day 2026 — Primary track: OKX AI (Agents), Secondary: X Layer RWA
 **Application deadline:** 11 Sept 2026 23:59 UTC
 
@@ -76,7 +76,7 @@ No DB for MVP. Stateless + `src/data/xlayer-assets.json`. No vector DB. No tradi
 
 Risk categories (fixed list): issuer, backing, redemption, liquidity, smart_contract, counterparty, regulatory_access, concentration, information. Severity: low/moderate/high/unknown. Never say "safe". Say "low observed concern / insufficient evidence".
 
-## 6. Tech stack (Render-friendly)
+## 6. Tech stack (Railway-friendly)
 - Language: TypeScript 5.x (strict)
 - Runtime: Node.js 24.15.0 (you already have it)
 - MCP: `@modelcontextprotocol/server` + `@modelcontextprotocol/express` + `@modelcontextprotocol/node` (Streamable HTTP, NOT old SSE)
@@ -109,11 +109,10 @@ npm i -D typescript @types/node @types/express tsx
 ```
 Measured sizes: `node_modules` ~54 MB, `dist` <1 MB.
 
-Render free tier: 512 MB RAM, shared CPU, sleeps after inactivity — fine for read-only MCP demo. Use Node 22+ in Render settings (set `NODE_VERSION=24`).
+Railway hobby tier: fine for read-only MCP demo (sleeps on inactivity — first call wakes it). Use Node 24.
 
 Other tools (no install size, web only):
-- GitHub account (to connect Render)
-- Railway account (railway.app)
+- GitHub account (connected to Railway with auto-deploy from `master`)
 - OKX dev portal key for Onchain OS Market (from https://web3.okx.com/onchainos/dev-portal/project) — Market read-only key only
 
 ## 8. Build order (for 17-25 Sept online build)
@@ -125,7 +124,7 @@ Phase 5: `analyze_backing` with FACT/CLAIM/UNKNOWN split.
 Phase 6: `research_asset` orchestrator + risks + unknowns + confidence.
 Phase 7: `compare_assets`.
 Phase 8: Deploy to Railway, connect Claude Desktop/Cursor to `https://uzam-production-95f9.up.railway.app/mcp`, demo: "Compare AAPLx vs TSLAx backing + biggest unanswered risks?"
-Phase 9 (shipped): paid REST via x402 (identify $0.15, preview $0.15, research $0.25, compare $0.50), landing page at `/` with live try-widget, 4-language reports, 16 assets, approved A2MCP listing on OKX.AI (#13653).
+Phase 9 (shipped): paid REST via x402 (identify $0.08, preview $0.08, research $0.25, compare $0.50), landing page at `/` with live try-widget, 4-language reports, 16 assets, approved A2MCP listing on OKX.AI (#13653).
 
 Do NOT build: dashboard, login, token, trading, wallet connect, Postgres, vector DB, dozens of chains.
 

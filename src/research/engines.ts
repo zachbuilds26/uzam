@@ -928,22 +928,36 @@ export function summarizeResearch(r: AnyObj): string {
   const lines: string[] = [];
   const L = (k: string): string => t(lang, k);
   const ta = r.onchain.trading_activity ?? {};
-  const conc = r.onchain.holder_concentration ?? {};
   // Verdict box: numbers first, one screen.
   lines.push(`## ${r.asset.symbol} — ${r.asset.name} (X Layer)`);
-  const prem = r.economics?.premium_discount_bps;
-  const premTxt = prem === null || prem === undefined
-    ? "premium n/a (no underlying reference)"
-    : `${prem >= 0 ? "+" : ""}${prem} bps (≈ ${(prem / 100).toFixed(2)}%) vs ${r.economics?.underlying_market_status === "closed" ? "CLOSED" : r.economics?.underlying_market_status === "unknown" ? "UNKNOWN-STATE" : "open"} reference`;
-  lines.push(`> Token **${ta.price ?? "n/a"}** vs underlying **${r.economics?.underlying_price ?? "n/a"}** (${premTxt})`);
-  lines.push(`> ${L("lbl_holders")} **${r.onchain.holders_count ?? "n/a"}** · Top-10 **${pct(conc.top10HoldPercent)}** · ${L("lbl_liquidity")} **${fmtNum(ta.liquidity) ?? "n/a"}**`);
-  lines.push(`> ${L("lbl_backing")}: **${r.backing.confidence}** — ${r.backing.custodian ?? "custodian UNKNOWN"}`);
+  const snap = r.research_snapshot ?? {};
+  lines.push(`### ${L("sec_snapshot")}`);
+  lines.push(`- ${snap.symbol ?? r.asset.symbol} · ${snap.underlying_asset ?? ""} · ${snap.issuer ?? ""} · ${snap.chain ?? "X Layer"}`);
+  lines.push(`- Research timestamp: ${snap.research_timestamp ?? r.data_timestamp} · Sources: ${snap.sources ?? "n/a"} (${snap.primary_sources ?? "n/a"} primary, ${snap.onchain_sources ?? "n/a"} on-chain)`);
+  const findings = (r.executive_findings as AnyObj[] | undefined) ?? [];
+  lines.push(`### ${L("sec_findings")}`);
+  if (findings.length === 0) lines.push(`- None established — see unknowns.`);
+  findings.forEach((f, i) => lines.push(`${i + 1}. ${f.finding} [${f.evidence_ref ?? "no ref"}]`));
+  const ident = r.identity ?? {};
+  const idChecks = (ident.verification_checks as AnyObj[] | undefined) ?? [];
+  lines.push(`### ${L("sec_identity")}`);
+  lines.push(`- Contract: ${ident.identity?.contract_address ?? "UNKNOWN"} · Standard/decimals: UNKNOWN (see explorer)`);
+  lines.push(`- ${L("sec_checks")}: ${idChecks.filter((c) => c.verified).length}/${idChecks.length} ${L("id_verified")}`);
+  const bd = r.backing_detail ?? {};
+  lines.push(`### ${L("sec_backing")} — ${L("lbl_claim")} / ${L("lbl_verified_fact")} / ${L("lbl_onchain_obs")} / ${L("lbl_unknown")}`);
+  lines.push(`- ${L("lbl_claim")}: ${cutWords(String(bd.issuer_claim ?? r.backing?.issuer_claim ?? "none extracted"), 220)}`);
+  const verList = (bd.independently_verified as AnyObj[] | undefined) ?? [];
+  lines.push(`- ${L("lbl_verified_fact")}: ${verList.length === 0 ? "none" : verList.map((v) => String(v.statement).slice(0, 140)).join(" | ")}`);
+  const obsList = (bd.onchain_observation as AnyObj[] | undefined) ?? [];
+  lines.push(`- ${L("lbl_onchain_obs")}: ${obsList.length === 0 ? "none" : obsList.map((o) => String(o.statement).slice(0, 140)).join(" | ")}`);
+  lines.push(`- Reserve/supply reconciliation: ${bd.reconciliation?.note ?? "not possible — no reserve amount"}`);
   lines.push(`> ${L("lbl_overall")}: **${r.confidence.overall}** — ${confidenceReceipt(r)}`);
   lines.push(`> ${L("scale")}`);
-  const premFormula = prem !== null && prem !== undefined && r.economics?.underlying_price
-    ? `Premium = (token − underlying) / underlying, token ${fmtMoney(ta.price_raw) ?? ta.price} vs spot ${r.economics.underlying_price} (${r.economics.reference_price_timestamp ?? "no timestamp"}).${r.economics.underlying_market_status === "closed" ? " Nasdaq was CLOSED — treat as stale, re-check when open." : ""}`
-    : `No premium computed (${!r.economics?.underlying_price ? "underlying spot unavailable" : "no token price"}).`;
-  lines.push(`### ${L("sec_premium")}`);
+  const pr = r.price_relationship ?? {};
+  const premFormula = pr.difference_bps !== null && pr.difference_bps !== undefined && pr.reference_price
+    ? `Premium = (token − underlying) / underlying, token ${pr.token_price ?? "n/a"} vs reference ${pr.reference_price} (${pr.timestamp ?? "no timestamp"}) — ${L("lbl_calc")}.${pr.market_status === "closed" ? " Underlying market was CLOSED — treat as stale, re-check when open." : ""}`
+    : `No premium computed (${!pr.reference_price ? "underlying reference unavailable" : "no token price"}). ${pr.limitations ?? ""}`;
+  lines.push(`### ${L("sec_price_rel")}`);
   lines.push(premFormula);
   // Market activity: everything OKX already returned, finally shown.
   const ph = r.onchain.price_history ?? null;
@@ -964,6 +978,15 @@ export function summarizeResearch(r: AnyObj): string {
     if (ta.turnover_24h != null || ta.liquidity_to_mcap != null || ta.avg_trade_size != null) {
       const turn = toNum(ta.turnover_24h);
       lines.push(`- Turnover 24h: **${turn !== null ? `${turn.toFixed(2)}x` : "n/a"}** · Liquidity/mcap: **${ta.liquidity_to_mcap ?? "n/a"}** · Avg trade: **${ta.avg_trade_size ? `$${fmtNum(ta.avg_trade_size)}` : "n/a"}** · Txs 24h: **${ta.txs24H ?? "n/a"}** · Volume 24h: **$${fmtNum(ta.volume24H_raw) ?? "n/a"}** · Mcap: **$${fmtNum(ta.marketCap_raw) ?? "n/a"}**.`);
+    }
+    const impact = r.liquidity_detail?.price_impact ?? null;
+    if (impact && Array.isArray(impact.venues) && impact.venues.length > 0) {
+      lines.push(`### ${L("sec_liquidity_detail")} (${L("lbl_calc")})`);
+      for (const v of impact.venues.slice(0, 5)) {
+        const e = v.estimates ?? {};
+        lines.push(`- ${v.venue} ($${v.liquidity_usd}): $100 → ${e.usd_100 ?? "n/a"} · $1k → ${e.usd_1000 ?? "n/a"} · $10k → ${e.usd_10000 ?? "n/a"}`);
+      }
+      lines.push(`- Method: ${impact.method}. ${impact.assumption}`);
     }
   }
   lines.push(`### ${L("sec_backing")}`);
@@ -993,10 +1016,15 @@ export function summarizeResearch(r: AnyObj): string {
     if (attL.length > 0) for (const a of attL) lines.push(`- Attestation: ${a}`);
     else lines.push(`- No reserve attestation link found on fetched pages.`);
   }
-  // All 9 risks, ranked — the buyer pays to see the hidden ones too.
-  const risks = [...((r.risks as Risk[] | undefined) ?? [])].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
+  // All 10 dossier risks — every category carries evidence, observation,
+  // meaning and its limitation. Ranked high to low, unknowns last.
+  const risks = [...((r.risks_detailed as DetailedRisk[] | undefined) ?? [])].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
   lines.push(`### ${L("sec_risks")}`);
-  for (const x of risks) lines.push(`- **${x.category}** (${sev(lang, x.severity)}): ${x.reason}`);
+  for (const x of risks) {
+    lines.push(`- **${x.category}** (${sev(lang, x.severity)}): ${x.risk}`);
+    lines.push(`  - Evidence: ${(x.evidence ?? []).join("; ") || "none"} · Observed: ${x.current_observation}`);
+    lines.push(`  - Means: ${x.what_it_means} · Limitation: ${x.unknown_limitation}`);
+  }
   // Unknowns reframed as diligence, not failure.
   lines.push(`### ${L("sec_checked")}`);
   const checked: string[] = [];
@@ -1012,14 +1040,14 @@ export function summarizeResearch(r: AnyObj): string {
     lines.push(`${L("lbl_couldnt")}:`);
     for (const u of unknowns) lines.push(`- ${u}`);
   }
-  // Evidence as linked bullets with tier badges.
-  const ev = ((r.evidence as AnyObj[] | undefined) ?? []).slice(0, 8);
-  lines.push(`### ${L("sec_evidence")} ${L("ev_original")}`);
-  if (ev.length === 0) lines.push(`- None captured — see unknowns.`);
-  for (const e of ev) {
-    const excerpt = cutWords(String(e.excerpt ?? ""), 200);
-    lines.push(`- [${e.source_title ?? "source"}](${e.source_url ?? "#"}) [Tier-${e.tier ?? "?"} ${e.source_type ?? ""}] — "${excerpt}"`);
+  // Source register: every important source with quality, dates and support.
+  const reg = ((r.source_register as AnyObj[] | undefined) ?? []);
+  lines.push(`### ${L("sec_sources")} ${L("ev_original")}`);
+  if (reg.length === 0) lines.push(`- None captured — see unknowns.`);
+  for (const s of reg.slice(0, 12)) {
+    lines.push(`- [${s.name ?? "source"}](${s.url ?? "#"}) [${s.quality ?? "?"} · ${s.type ?? ""}] — supports: ${cutWords(String(s.supports ?? ""), 160)} (retrieved ${s.retrieved_at ?? "?"})`);
   }
+  lines.push(`- Quality scale: PRIMARY = official issuer/legal docs, official xStocks data, on-chain evidence · SECONDARY = exchange data, recognized providers · TERTIARY = reputable news · UNVERIFIED = social/community claims (none used in this report). Quality rates THE SOURCE, never the asset.`);
   const recent = ((r.recent_developments as AnyObj[] | undefined) ?? []).slice(0, 3);
   lines.push(`### ${L("sec_recent")}`);
   if (recent.length === 0) lines.push(`- None found${r.recent_note ? ` (${r.recent_note})` : ""}.`);
@@ -1115,11 +1143,395 @@ export function summarizeCompare(c: AnyObj): string {
     lines.push(`### ${L("sec_whales")}`);
     for (const h of shared) lines.push(`- \`${String(h.address).slice(0, 12)}…\` in ${h.tokens.join(", ")} (max ${h.max_percent}%) — consistent with issuer/venue wallets, UNVERIFIED.`);
   }
+  // Normalized side-by-side matrix: one row per metric, one column per asset.
+  const matrix = ((c.comparison_table as AnyObj[] | undefined) ?? []);
+  if (matrix.length > 0) {
+    lines.push(`### ${L("sec_compare_matrix")} (value · source)`);
+    let lastCat = "";
+    for (const m of matrix) {
+      if (m.category !== lastCat) {
+        lastCat = m.category;
+        const cols = (c.compared as string[]).join(" | ");
+        lines.push(`**${lastCat}**`);
+        lines.push(`| Metric | ${cols} |`);
+        lines.push(`|---|${(c.compared as string[]).map(() => "---").join("|")}|`);
+      }
+      const cells = (c.compared as string[]).map((s) => {
+        const v = m.values?.[s]?.value;
+        return v === null || v === undefined || v === "" ? "n/a" : String(v).slice(0, 60);
+      });
+      lines.push(`| ${m.metric} | ${cells.join(" | ")} |`);
+    }
+    lines.push(`- Metric-specific observations only — never an overall winner. Timestamps and per-cell sources in JSON.`);
+  }
   const nf = ((c.not_found as string[] | undefined) ?? []);
   if (nf.length > 0) lines.push(`Not found: ${nf.join(", ")}.`);
   if (typeof c.duplicates_dropped === "number" && c.duplicates_dropped > 0) lines.push(`Note: ${c.duplicates_dropped} duplicate input(s) collapsed.`);
   if (Array.isArray(c.dropped_symbols) && c.dropped_symbols.length > 0) lines.push(`${c.dropped_note ?? `Ignored: ${c.dropped_symbols.join(", ")}.`}`);
   return lines.join("\n");
+}
+
+// ---- Service 1: identify — fast identity verification, NOT a research report ----
+// Answers "what exactly is this token?" in under a minute: identity fields,
+// legal/product structure, explicit verification checks, official sources and
+// unknowns. No market analysis, no live quotes, no fetches — registry only.
+// Every check is { check, status, detail }: "verified" only when the registry
+// itself ties the field to an official source; otherwise "unverified".
+// Fields the registry cannot establish (standard, decimals, rights,
+// jurisdiction, live status) are UNKNOWN, never guessed.
+export function buildIdentity(symbol: string, opts?: { lang?: string }): AnyObj {
+  const lang = normalizeLang(opts?.lang);
+  const L = (k: string): string => t(lang, k);
+  const fallbackNote = langFallbackNote(opts?.lang, lang);
+  const clean = symbol.trim().toUpperCase();
+  const asset = findAsset(clean);
+  const ts = now();
+  if (!asset) {
+    return {
+      service: "identify",
+      found: false, symbol: clean, lang,
+      ...(fallbackNote ? { lang_note: fallbackNote } : {}),
+      uncertainty: L("id_unknown"),
+      supported_symbols: supportedSymbols(), confidence: "UNKNOWN", data_timestamp: ts,
+    };
+  }
+  const chain = chainMeta();
+  const published = asset.issuer_published_contract ?? null;
+  const publishedOk = typeof published === "string" && /^0x[0-9a-fA-F]{40}$/.test(published);
+  const listedContracts = (asset.contract_addresses ?? []).filter((c) => /^0x[0-9a-fA-F]{40}$/.test(c));
+  const contractListed = publishedOk && listedContracts.some((c) => c.toLowerCase() === (published as string).toLowerCase());
+  const check = (name: string, ok: boolean, detail: string): AnyObj =>
+    ({ check: name, status: ok ? L("id_verified") : L("id_unverified"), verified: ok, detail });
+  const checks = [
+    check("symbol_matches_official_source", !!asset.product_page,
+      asset.product_page ? `Registry links the official xStocks product page for this exact symbol: ${asset.product_page}` : "No official product page recorded for this symbol."),
+    check("contract_matches_official_source", publishedOk,
+      publishedOk ? `xStocks product data publishes ${(published as string)} for ${asset.symbol} (issuer-published address).` : "No issuer-published contract address recorded — resolve via OKX token search (chainIndex 196) or the xStocks tokenlist."),
+    check("network_matches_official_source", true,
+      `Registry chain block: ${chain.name} (chainId ${chain.chainId}, OKX chainIndex ${chain.chainIndex}).`),
+    check("underlying_matches_official_source", !!(asset.underlying?.ticker),
+      asset.underlying?.ticker ? `Registry records underlying ${asset.underlying.ticker} on ${asset.underlying.exchange ?? "unknown exchange"} with SEC CIK ${asset.underlying.cik ?? "n/a"}.` : "No explicit underlying ticker recorded."),
+    check("issuer_matches_official_documentation", !!(asset.issuer_legal && asset.official_documents.length > 0),
+      asset.issuer_legal ? `Legal entity recorded as ${asset.issuer_legal}; ${asset.official_documents.length} official document link(s) on file.` : "No legal entity name recorded."),
+  ];
+  const explorerContract = publishedOk
+    ? `https://www.okx.com/web3/explorer/xlayer/token/${published}`
+    : null;
+  const unknown: string[] = [
+    "Token standard (e.g. ERC-20) — not recorded in the registry. Confirm on the chain explorer.",
+    "Decimals — not recorded in the registry. Confirm on the chain explorer or via research (token meta).",
+    "Direct shareholder rights — UNKNOWN. The token tracks the underlying per the issuer's claim; whether it confers shareholder rights must be confirmed in the issuer's Final Terms.",
+    "Voting rights — UNKNOWN. Confirm in the issuer's Final Terms.",
+    "Jurisdiction and eligibility — UNKNOWN in this check. See research (issuer focus) for extracted geo passages.",
+    "Current issuer status — UNKNOWN. The registry is a snapshot; live status needs current issuer documentation.",
+    "Backing and reserves — out of scope for identify. See research (backing focus).",
+  ];
+  if (!contractListed && publishedOk && listedContracts.length > 0) {
+    unknown.push("Registry contract list differs from the issuer-published address — treat the token as unverified until reconciled.");
+  }
+  return {
+    service: "identify",
+    found: true, symbol: asset.symbol, lang,
+    ...(fallbackNote ? { lang_note: fallbackNote } : {}),
+    identity: {
+      token_symbol: asset.symbol,
+      token_name: asset.name,
+      underlying_asset: asset.underlying_asset,
+      underlying_ticker: asset.underlying?.ticker ?? null,
+      issuer: asset.issuer,
+      network: chain.name,
+      chain_id: chain.chainId,
+      contract_address: published,
+      token_standard: null,
+      decimals: null,
+      asset_status: "tracked_in_registry — live status not checked in identify; use research for live data",
+    },
+    legal_structure: {
+      instrument_type: asset.asset_type,
+      represents: "Issuer describes the token as tracking the underlying 1:1 (ISSUER CLAIM — evidence in research, backing focus).",
+      direct_shareholder_rights: null,
+      voting_rights: null,
+      legal_entity: asset.issuer_legal ?? null,
+      jurisdiction: null,
+      official_product_documentation: asset.official_documents,
+    },
+    verification_checks: checks,
+    official_sources: {
+      product_page: asset.product_page ?? null,
+      issuer_documentation: asset.official_website,
+      legal_documentation: asset.official_documents,
+      chain_explorer_contract: explorerContract,
+    },
+    unknown,
+    summary: `## ${asset.symbol} — ${asset.name} (${chain.name})\n` +
+      `- ${asset.underlying_asset} · issued as ${asset.issuer}${asset.issuer_legal ? ` (${asset.issuer_legal})` : ""}\n` +
+      `- Contract: ${published ?? "UNKNOWN"} · Standard/decimals: UNKNOWN (see explorer)\n` +
+      `- Checks: ${checks.filter((c) => c.verified).length}/${checks.length} ${L("id_verified")}\n` +
+      `- Shareholder/voting rights, jurisdiction, live status: UNKNOWN — confirm in Final Terms; market data: see research.`,
+    confidence: "MEDIUM",
+    data_timestamp: ts,
+  };
+}
+
+// ---- Service 2: research — evidence dossier builders ----
+// The dossier separates every statement into CLAIM (issuer says), VERIFIED
+// FACT (primary source or direct observation), ON-CHAIN OBSERVATION (current
+// chain measurement), CALCULATION (Uzam arithmetic, labeled) and UNKNOWN
+// (evidence insufficient). Nothing is promoted without supporting evidence.
+
+type Quality = "PRIMARY" | "SECONDARY" | "TERTIARY" | "UNVERIFIED";
+
+function qualityOf(sourceType: string): Quality {
+  if (
+    sourceType === "official_issuer" || sourceType === "official_documentation" ||
+    sourceType === "legal_document" || sourceType === "reserve_report" ||
+    sourceType === "blockchain_data"
+  ) return "PRIMARY";
+  if (sourceType === "market_data" || sourceType === "third_party") return "SECONDARY";
+  if (sourceType === "reputable_news") return "TERTIARY";
+  return "UNVERIFIED";
+}
+
+/** Source register: every important source with name, URL, type, quality,
+ * dates and what it supports. No UNVERIFIED sources are used — the register
+ * says so explicitly instead of silently omitting the tier. */
+export function buildSourceRegister(evidence: AnyObj[], recent: AnyObj[], extra: { okxUsed: boolean; tokenlistUrl: string | null; tokenlistListed: boolean; spotSource: string | null; ts: string }): AnyObj[] {
+  const seen = new Set<string>();
+  const reg: AnyObj[] = [];
+  const push = (name: string, url: string | null, type: string, quality: Quality, published: string | null, retrieved: string, supports: string): void => {
+    const key = `${type}|${url ?? name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    reg.push({ name, url, type, quality, published_at: published, retrieved_at: retrieved, supports });
+  };
+  for (const e of evidence) {
+    const url = typeof e.source_url === "string" && e.source_url.startsWith("https://") ? e.source_url : null;
+    push(
+      String(e.source_title ?? "Untitled source"), url,
+      String(e.source_type ?? "unknown"), qualityOf(String(e.source_type ?? "")),
+      null, String(e.retrieved_at ?? extra.ts),
+      `${String(e.claim ?? "evidence").slice(0, 160)} [basis: ${String(e.basis ?? "?")}, confidence ${String(e.confidence ?? "?")}]`
+    );
+  }
+  if (extra.okxUsed) {
+    push("OKX Onchain OS (DEX market endpoints, chainIndex 196)", "https://web3.okx.com/onchainos", "exchange_documentation", "SECONDARY", null, extra.ts, "Token price, supply, holders, concentration, trades, pools — exchange data, not issuer verification.");
+  }
+  if (extra.tokenlistUrl) {
+    push("xStocks token list (Backed, CowSwap format)", extra.tokenlistUrl, "official_xstocks_api", extra.tokenlistListed ? "PRIMARY" : "SECONDARY", null, extra.ts, extra.tokenlistListed ? "Independent confirmation that the resolved contract is listed for this symbol on chain 196." : "Checked for the resolved contract; listing not confirmed.");
+  }
+  if (extra.spotSource) {
+    push("Yahoo Finance quote (via keyless chart API)", "https://finance.yahoo.com", "market_data_provider", "SECONDARY", null, extra.ts, "Underlying/reference price only — unverified third party, never token evidence.");
+  }
+  for (const n of recent.slice(0, 5)) {
+    if (typeof n.url === "string" && n.url.startsWith("https://")) {
+      push(String(n.title ?? "News item").slice(0, 120), n.url, "news", "TERTIARY", typeof n.published_at === "string" ? n.published_at : null, extra.ts, "Context on the underlying company — never token backing evidence.");
+    }
+  }
+  return reg;
+}
+
+const IMPACT_SIZES = [100, 1000, 10000];
+
+/** Price-impact estimates per venue for $100/$1,000/$10,000 trades.
+ * CALCULATION, not observation: impact ≈ size / (pool_liquidity + size),
+ * assuming the pool's stated total liquidity is fully available on one side.
+ * Real impact may be LARGER (reserve split, fees, routing unknown). No
+ * liquidity figure => no estimate, never a zero. */
+export function buildPriceImpact(pools: AnyObj | null): AnyObj {
+  const rows: AnyObj[] = Array.isArray(pools?.pools) ? pools.pools : [];
+  const venues = rows
+    .map((p: AnyObj) => {
+      const liq = toNum(p.liquidity_usd);
+      if (liq === null || liq <= 0) return null;
+      const estimates: AnyObj = {};
+      for (const s of IMPACT_SIZES) estimates[`usd_${s}`] = `${((s / (liq + s)) * 100).toFixed(2)}%`;
+      return { venue: String(p.label ?? "Pool"), liquidity_usd: liq.toFixed(2), estimates };
+    })
+    .filter(Boolean);
+  return {
+    venue_count: venues.length,
+    venues,
+    method: "impact_pct = trade_usd / (pool_liquidity_usd + trade_usd) x 100 per venue",
+    assumption: "Pool's stated total liquidity treated as single-sided reserves; fees, routing and reserve split unknown — real impact may be larger. CALCULATION, not a market fact.",
+    ...(venues.length === 0 ? { note: "Unknown — no venue liquidity figures available, no impact estimated." } : {}),
+  };
+}
+
+export type DetailedRisk = {
+  category: string;
+  severity: "low" | "moderate" | "high" | "unknown";
+  risk: string;
+  evidence: string[];
+  current_observation: string;
+  what_it_means: string;
+  unknown_limitation: string;
+};
+
+/** The 10 dossier risk categories. Observed severities are reused from
+ * buildRisks (thresholds documented there); structural categories with no
+ * data source read "unknown" with the gap stated — never filler. */
+export function buildRisksDetailed(ctx: {
+  base: Risk[]; underlyingCode: string; exchange: string | null; underlyingPrice: string | null;
+  premiumBps: number | null; marketStatus: string | null; liquidityRaw: number | null; venueCount: number;
+  custodianNamed: boolean; geoCount: number; tokenDecimals: number | null; spotSource: string | null;
+  okxOk: number; okxTotal: number; redemptionExcerpts: number;
+}): DetailedRisk[] {
+  const byCat = (c: string): Risk | undefined => ctx.base.find((r) => r.category === c);
+  const sevOf = (c: string): DetailedRisk["severity"] => byCat(c)?.severity ?? "unknown";
+  const worse = (a: DetailedRisk["severity"], b: DetailedRisk["severity"]): DetailedRisk["severity"] => {
+    const rank: Record<string, number> = { high: 0, moderate: 1, unknown: 2, low: 3 };
+    return rank[a] <= rank[b] ? a : b;
+  };
+  return [
+    {
+      category: "underlying_equity",
+      severity: "unknown",
+      risk: `The token tracks ${ctx.underlyingCode} — single-equity exposure including downside, volatility and corporate actions. Uzam performs no company analysis.`,
+      evidence: ["registry:underlying", "sec:edgar-filings"],
+      current_observation: `Underlying ${ctx.underlyingCode}${ctx.exchange ? ` (${ctx.exchange})` : ""}; reference price ${ctx.underlyingPrice ?? "unavailable"}.`,
+      what_it_means: "Token value follows one company's stock. Company-specific events affect the token's reference value.",
+      unknown_limitation: "Fundamentals, earnings quality and upcoming corporate actions not analyzed; dividend passthrough treatment UNKNOWN.",
+    },
+    {
+      category: "tracking_pricing",
+      severity: ctx.premiumBps === null ? "unknown" : ctx.marketStatus === "closed" ? "moderate" : "low",
+      risk: "Token price can deviate from the underlying reference (premium/discount), especially outside market hours when the reference is stale.",
+      evidence: ["uzam:premium-calculation", "okx:market/price", "yahoo:reference-quote"],
+      current_observation: ctx.premiumBps === null ? "No premium computed (token price or reference unavailable)." : `Premium/discount ${ctx.premiumBps >= 0 ? "+" : ""}${ctx.premiumBps} bps vs ${ctx.marketStatus ?? "unknown-state"} reference.`,
+      what_it_means: "You may pay more (or receive less) than the underlying reference price at trade time.",
+      unknown_limitation: "Intraday creation/redemption arbitrage mechanics not observed; exact deviation drivers UNKNOWN.",
+    },
+    {
+      category: "liquidity",
+      severity: sevOf("liquidity"),
+      risk: byCat("liquidity")?.reason ?? "No liquidity figure available.",
+      evidence: byCat("liquidity")?.evidence ?? [],
+      current_observation: ctx.liquidityRaw === null ? "No liquidity figure available." : `Observed liquidity $${fmtNum(ctx.liquidityRaw) ?? ctx.liquidityRaw} across ${ctx.venueCount} venue(s). See calculated price impact.`,
+      what_it_means: "Thin books can mean large price impact on entry and exit.",
+      unknown_limitation: ctx.venueCount === 0 ? "No venues identified — liquidity outside OKX top-pools UNKNOWN." : "Venues beyond OKX top-liquidity not surveyed.",
+    },
+    {
+      category: "issuer_counterparty",
+      severity: worse(sevOf("issuer"), sevOf("counterparty")),
+      risk: "Token value depends on the issuer, custodian and their intermediaries performing — not just the smart contract.",
+      evidence: [...(byCat("issuer")?.evidence ?? []), ...(byCat("counterparty")?.evidence ?? [])],
+      current_observation: byCat("issuer")?.reason ?? "Issuer pages not read.",
+      what_it_means: "Issuer failure, freeze or restructuring can impair redemption regardless of chain state.",
+      unknown_limitation: "Current issuer financial standing and operational resilience not assessed from primary sources.",
+    },
+    {
+      category: "custody",
+      severity: ctx.custodianNamed ? "moderate" : "high",
+      risk: "Backing depends on a custodian holding the underlying; custody terms are the issuer's description until verified.",
+      evidence: ["uzam:analyze_backing"],
+      current_observation: ctx.custodianNamed ? "A custodian is named on official pages (still the issuer's claim)." : "No specific custodian named on the fetched official pages.",
+      what_it_means: "If custody fails or is misdescribed, the token's backing claim fails with it.",
+      unknown_limitation: "No independent custodian attestation gathered; segregation and audit status UNKNOWN.",
+    },
+    {
+      category: "legal_regulatory",
+      severity: sevOf("regulatory_access"),
+      risk: byCat("regulatory_access")?.reason ?? "Eligibility unknown.",
+      evidence: byCat("regulatory_access")?.evidence ?? [],
+      current_observation: ctx.geoCount > 0 ? `${ctx.geoCount} jurisdiction/eligibility passage(s) extracted — confirm eligibility in issuer terms.` : "No jurisdiction/eligibility list extracted from fetched pages.",
+      what_it_means: "Tokenized equities typically carry geo and eligibility restrictions; holders in excluded regions may be unable to hold or redeem.",
+      unknown_limitation: "Full restricted-country list and investor-eligibility criteria UNKNOWN beyond extracted passages.",
+    },
+    {
+      category: "smart_contract",
+      severity: sevOf("smart_contract"),
+      risk: byCat("smart_contract")?.reason ?? "No contract audit reviewed.",
+      evidence: byCat("smart_contract")?.evidence ?? [],
+      current_observation: `No contract audit reviewed in this report.${ctx.tokenDecimals !== null ? ` Token decimals observed: ${ctx.tokenDecimals}.` : ""}`,
+      what_it_means: "Bugs, upgrade keys or admin controls in the token contract can affect balances independently of backing.",
+      unknown_limitation: "Contract audit status, proxy/admin-key structure UNKNOWN.",
+    },
+    {
+      category: "blockchain_network",
+      severity: "unknown",
+      risk: "The token lives on X Layer (chain 196, EVM L2) — sequencer, bridge and finality behavior are the network's, not the issuer's.",
+      evidence: ["registry:chain-block"],
+      current_observation: "X Layer chainId 196, EVM-compatible L2; RPC and explorer recorded in chain info.",
+      what_it_means: "Network outages, congestion or sequencer issues can delay transfers and price discovery.",
+      unknown_limitation: "Validator/sequencer decentralization and incident history not assessed.",
+    },
+    {
+      category: "oracle_data",
+      severity: "moderate",
+      risk: "Every price and reference figure comes from third-party data providers (OKX, Yahoo), not from the issuer or the chain.",
+      evidence: ["okx:market-endpoints", "yahoo:reference-quote"],
+      current_observation: ctx.spotSource ? `Reference via ${ctx.spotSource} (unverified third party).` : "No reference price source available.",
+      what_it_means: "Stale, erroneous or manipulated feeds produce wrong premiums and wrong conclusions.",
+      unknown_limitation: "No oracle audit; feed methodology and update cadence UNKNOWN.",
+    },
+    {
+      category: "operational",
+      severity: sevOf("information"),
+      risk: byCat("information")?.reason ?? "Source coverage unknown.",
+      evidence: byCat("information")?.evidence ?? [],
+      current_observation: `${ctx.okxOk}/${ctx.okxTotal} OKX endpoints returned data; ${ctx.redemptionExcerpts} redemption passage(s) extracted.`,
+      what_it_means: "Gaps in data mean conclusions rest on fewer sources — treat thinly-sourced sections as provisional.",
+      unknown_limitation: "Redemption minimums, fees and settlement time must be confirmed in current issuer terms.",
+    },
+  ];
+}
+
+/** 3-7 executive findings: factual only, each with an evidence reference.
+ * Never a recommendation; gaps are stated as findings about the evidence. */
+export function buildFindings(ctx: {
+  symbol: string; name: string; checksVerified: number; checksTotal: number;
+  tokenPrice: string | null; underlyingPrice: string | null; premiumBps: number | null;
+  marketStatus: string | null; refTs: string | null;
+  top10: number | null; top5: number | null; holders: number | null;
+  liquidityRaw: number | null; venueCount: number;
+  backingConfidence: string; custodianNamed: boolean;
+  contradictions: number; firstContradiction: string | null;
+  unknowns: string[]; evidenceCount: number;
+}): AnyObj[] {
+  const findings: AnyObj[] = [];
+  findings.push({
+    finding: `${ctx.symbol} identified as ${ctx.name}: ${ctx.checksVerified}/${ctx.checksTotal} identity checks verified against official sources.`,
+    evidence_ref: "identify:verification_checks",
+  });
+  if (ctx.tokenPrice !== null && ctx.underlyingPrice !== null && ctx.premiumBps !== null) {
+    findings.push({
+      finding: `Token ${ctx.tokenPrice} vs underlying reference ${ctx.underlyingPrice} = ${ctx.premiumBps >= 0 ? "+" : ""}${ctx.premiumBps} bps (${ctx.refTs ?? "no reference timestamp"}; underlying market ${ctx.marketStatus ?? "unknown"}).${ctx.marketStatus === "closed" ? " Reference is stale — re-check when open." : ""}`,
+      evidence_ref: "uzam:premium-calculation",
+    });
+  }
+  if (ctx.top10 !== null) {
+    findings.push({
+      finding: `Top-10 holders control ${ctx.top10}% of supply${ctx.top5 !== null ? `; top-5 control ${ctx.top5}%` : ""}${ctx.holders !== null ? ` across ${ctx.holders} holders` : ""} (observation, not a judgment).`,
+      evidence_ref: "okx:advanced-info:top10HoldPercent",
+    });
+  }
+  if (ctx.liquidityRaw !== null) {
+    findings.push({
+      finding: `Observed liquidity $${fmtNum(ctx.liquidityRaw) ?? ctx.liquidityRaw} across ${ctx.venueCount} venue(s) — see calculated price impact before assuming exit size.`,
+      evidence_ref: "okx:price-info:liquidity",
+    });
+  }
+  findings.push({
+    finding: `Backing evidence confidence ${ctx.backingConfidence}; custodian ${ctx.custodianNamed ? "named on official pages (issuer claim)" : "UNKNOWN"}. Reserve amount unavailable — reserve/supply reconciliation not possible.`,
+    evidence_ref: "uzam:analyze_backing",
+  });
+  if (ctx.contradictions > 0) {
+    findings.push({
+      finding: `${ctx.contradictions} conflict(s) between sources flagged${ctx.firstContradiction ? `: ${ctx.firstContradiction}` : ""} — both sides shown, neither silently chosen.`,
+      evidence_ref: "uzam:contradiction-checks",
+    });
+  }
+  const reserveUnknown = ctx.unknowns.some((u) => /reserve|attest|reconcil/i.test(u));
+  if (!reserveUnknown) {
+    findings.push({
+      finding: `${ctx.unknowns.length} question(s) could not be answered from available evidence — see unknowns.`,
+      evidence_ref: "uzam:report-sections",
+    });
+  }
+  if (findings.length < 3) {
+    findings.push({ finding: `Evidence base: ${ctx.evidenceCount} evidence item(s), ${ctx.unknowns.length} open question(s) — see unknowns and source register.`, evidence_ref: "uzam:report-sections" });
+  }
+  return findings.slice(0, 7);
 }
 
 // ---- research_asset: one-call full report ----
@@ -1139,16 +1551,45 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     };
   }
   if (focus === "issuer") {
+    // Issuer focus: identity + legal research from official documents.
+    // No onchain, spot, filings or news fetches — only issuer/legal sections.
+    const backingI = await gatherBacking(asset);
+    const identityI = buildIdentity(clean, { lang });
+    const evI: AnyObj[] = Array.isArray(backingI.evidence) ? backingI.evidence : [];
+    const registerI = buildSourceRegister(evI, [], {
+      okxUsed: false, tokenlistUrl: TOKENLIST_RAW, tokenlistListed: false, spotSource: null, ts: now(),
+    });
+    const unknownsI: string[] = [
+      ...(Array.isArray(backingI.unanswered_questions) ? backingI.unanswered_questions : []),
+      "Registration details and regulatory licenses — confirm in the issuer's legal documentation.",
+      "Security agent (if any) — not confirmed from fetched pages.",
+      "Distribution restrictions beyond extracted geo passages — confirm in Final Terms.",
+    ];
     const secs = ((Date.now() - t0) / 1000).toFixed(1);
     return {
+      service: "research",
       found: true, focus, lang,
       ...(fallbackNote ? { lang_note: fallbackNote } : {}),
       asset: { symbol: asset.symbol, name: asset.name, asset_type: asset.asset_type },
+      identity: identityI,
       issuer: { name: asset.issuer, legal: asset.issuer_legal ?? null, website: asset.official_website, documents: asset.official_documents },
       underlying: { exposure: asset.underlying_asset, ...(asset.underlying ?? {}) },
-      note: "Issuer focus: identity only, no onchain or document fetches performed.",
-      confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: "UNKNOWN" },
-      receipt: `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · 0/7 ${L("rpt_endpoints")} + 0 ${L("rpt_pages")} + identity only ${L("rpt_in")} ${secs}s · data ${now()}`,
+      legal_structure: identityI.legal_structure ?? null,
+      issuer_claims: {
+        backing_claim: backingI.issuer_claim ?? null,
+        custodian: backingI.custodian ?? null,
+        redemption_excerpts: backingI.redemption_excerpts ?? [],
+        geo_excerpts: backingI.geo_excerpts ?? [],
+        attestation_links: backingI.attestation_links ?? [],
+      },
+      independently_verified: [],
+      independently_verified_note: "No independent (non-issuer) verification performed in issuer focus — issuer statements below are CLAIMs, not FACTs.",
+      unknowns: unknownsI,
+      unknowns_mandatory: unknownsI,
+      source_register: registerI,
+      note: "Issuer focus: identity + legal/document research only. No onchain, market, filings or news fetches performed.",
+      confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: backingI.confidence ?? "UNKNOWN" },
+      receipt: `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · issuer focus, ${Array.isArray(backingI.pages_read) ? backingI.pages_read.length : 0} ${L("rpt_pages")} ${L("rpt_in")} ${secs}s · data ${now()}`,
       data_timestamp: now(),
     };
   }
@@ -1229,6 +1670,9 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   }
   const contradictions = detectContradictions(asset, onchain);
   const risks = buildRisks(onchain, backing);
+  const covD = okxCoverage(Array.isArray(onchain.missing) ? onchain.missing : []);
+  // Evidence assembly hoisted here: the dossier sections below need
+  // unknowns/evidence/geo/attestation before the report object is built.
   const tlListed = onchain.tokenlist_check?.listed === true && onchain.tokenlist_check?.stale !== true;
   const unknowns: string[] = [
     ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions.filter((q) => tlListed ? !/No independent.*verification/i.test(String(q)) : true) : []),
@@ -1250,17 +1694,11 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   if (attestLinks.length === 0 && !backingQs.some((q) => /attest/i.test(String(q)))) {
     unknowns.push("No reserve attestation or proof-of-reserves link found on fetched pages.");
   }
-  // Explorer record is chain data (the contract exists on X Layer), not a
-  // market quote — Tier 1, but MEDIUM: an explorer is a view of the chain,
-  // not a direct chain read.
   const evidence: AnyObj[] = [
     ...(Array.isArray(backing.evidence) ? backing.evidence.slice(0, 10) : []),
     ...(onchain.explorer ? [{ claim: "Onchain record for this contract.", source_title: "OKX X Layer explorer", source_url: onchain.explorer, excerpt: `Contract ${Array.isArray(onchain.contracts) ? onchain.contracts[0] : ""} on X Layer (chain 196).`,     basis: "fact", source_type: "blockchain_data" as SourceType, tier: 1, confidence: "MEDIUM", retrieved_at: now() }] : []),
     ...(Array.isArray(onchain.extra_evidence) ? onchain.extra_evidence : []),
   ];
-  // SEC filings as Tier-1 legal evidence (underlying company, not the token).
-  // Confidence MEDIUM per itemConfidence: a filing proves the underlying's
-  // financials, never the token's backing.
   for (const f of [filings.latest_10k, filings.latest_10q]) {
     if (f) {
       evidence.push({
@@ -1271,11 +1709,109 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       });
     }
   }
+  // ---- Dossier sections (additive — legacy keys below stay untouched) ----
+  const identity = buildIdentity(clean, { lang });
+  const checksVerified = (identity.verification_checks as AnyObj[] ?? []).filter((c) => c.verified).length;
+  const checksTotal = (identity.verification_checks as AnyObj[] ?? []).length;
+  const conc = onchain.holder_concentration ?? {};
+  const topHolders: AnyObj[] = Array.isArray(conc.topHolders) ? conc.topHolders : [];
+  const top5 = topHolders.length > 0 ? Number(topHolders.reduce((s: number, h: AnyObj) => s + (Number(h.percent) || 0), 0).toFixed(2)) : null;
+  const top10num = toNum(conc.top10HoldPercent);
+  const liqRaw = toNum(econ.liquidity_raw);
+  const poolRows: AnyObj[] = Array.isArray(onchain.pools?.pools) ? onchain.pools.pools : [];
+  const priceImpact = buildPriceImpact(onchain.pools ?? null);
+  const tlCheck = onchain.tokenlist_check ?? {};
+  const verifiedList: AnyObj[] = [];
+  if (tlCheck.checked === true && tlCheck.listed === true) {
+    verifiedList.push({ statement: `Independent tokenlist lists this exact contract on X Layer (chain 196) as ${tlCheck.matched_symbol ?? "the symbol"}.`, source: "xStocks token list (Backed)", url: TOKENLIST_RAW });
+  }
+  const crosscheck = onchain.contract_crosscheck ?? {};
+  if (crosscheck.checked === true && crosscheck.agrees === true) {
+    verifiedList.push({ statement: "OKX-resolved contract matches the issuer-published contract for this symbol.", source: "xStocks product data + OKX token search (chainIndex 196)", url: asset.product_page ?? null });
+  }
+  if (onchain.explorer) {
+    verifiedList.push({ statement: "Chain explorer record exists for this contract on X Layer (the contract exists on-chain; proves existence, never backing).", source: "OKX X Layer explorer", url: onchain.explorer });
+  }
+  for (const f of [filings.latest_10k, filings.latest_10q]) {
+    if (f) verifiedList.push({ statement: `Underlying ${underlyingCode} filed ${f.form} on ${f.date} (SEC EDGAR) — verifies the UNDERLYING company's disclosures, never the token's backing.`, source: "SEC EDGAR", url: f.url });
+  }
+  const onchainObs: AnyObj[] = [];
+  if (onchain.supply) onchainObs.push({ statement: `Circulating supply observed: ${JSON.stringify(onchain.supply)}.`, source: "OKX price-info" });
+  if (Array.isArray(onchain.contracts) && onchain.contracts[0]) onchainObs.push({ statement: `Contract observed on X Layer: ${onchain.contracts[0]}.`, source: "OKX token search (chainIndex 196)" });
+  if (onchain.holders_count !== null && onchain.holders_count !== undefined) onchainObs.push({ statement: `Holder count observed: ${onchain.holders_count}.`, source: "OKX price-info" });
+  const backingUnknown: string[] = [
+    ...(Array.isArray(backing.unanswered_questions) ? backing.unanswered_questions : []),
+    "Reserve amount unavailable — no proof-of-reserves figure retrieved, so reserve/supply reconciliation is not possible.",
+  ];
+  const tokenSupplyRaw = onchain.supply?.circulating ?? null;
+  const backingDetail = {
+    issuer_claim: backing.issuer_claim ?? null,
+    custodian: backing.custodian ?? null,
+    independently_verified: verifiedList,
+    onchain_observation: onchainObs,
+    unknown: backingUnknown,
+    reconciliation: {
+      reserve_amount: null,
+      token_supply: tokenSupplyRaw,
+      reconciled: null,
+      note: "Cannot reconcile: no reserve amount retrieved from any source. Token supply alone proves nothing about backing.",
+    },
+    reserve_evidence_date: null,
+    attestation_links: attestLinks,
+  };
+  const refTs = spot.date ? `${spot.date} ${spot.time ?? ""}`.trim() : null;
+  const priceRelationship = {
+    token_price: econ.price ?? null,
+    reference_price: spot.price !== null ? spot.price.toFixed(2) : null,
+    difference: premiumBps !== null && spot.price ? (tokenPx - spot.price).toFixed(2) : null,
+    difference_bps: premiumBps,
+    timestamp: refTs,
+    market_status: spot.price !== null ? mktStatus : null,
+    limitations: "Tokenized assets trade outside equity market hours against a stale reference; the reference is an unverified third-party quote, never the issuer's redemption value. CALCULATED difference, not a tradable spread.",
+  };
+  const risksDetailed = buildRisksDetailed({
+    base: risks, underlyingCode, exchange: asset.underlying?.exchange ?? null,
+    underlyingPrice: spot.price !== null ? spot.price.toFixed(2) : null,
+    premiumBps, marketStatus: spot.price !== null ? mktStatus : null,
+    liquidityRaw: liqRaw, venueCount: poolRows.length,
+    custodianNamed: !!detectNamedCustodian((Array.isArray(backing.evidence) ? backing.evidence : []).map((e: AnyObj) => String(e.excerpt ?? ""))),
+    geoCount: geoExcerpts.length,
+    tokenDecimals: onchain.token_meta?.decimals ?? null,
+    spotSource: spot.price !== null ? "Yahoo Finance quote (unverified third party)" : null,
+    okxOk: covD.ok, okxTotal: covD.total,
+    redemptionExcerpts: Array.isArray(backing.redemption_excerpts) ? backing.redemption_excerpts.length : 0,
+  });
+  const sourceRegister = buildSourceRegister(evidence, recent.items, {
+    okxUsed: covD.ok > 0, tokenlistUrl: TOKENLIST_RAW, tokenlistListed: !!tlListed,
+    spotSource: spot.price !== null ? "yahoo" : null, ts: now(),
+  });
+  const primaryCount = evidence.filter((e: AnyObj) => e.tier === 1).length;
+  const snapshot = {
+    symbol: asset.symbol, underlying_asset: asset.underlying_asset, issuer: asset.issuer,
+    chain: "X Layer (chainId 196, OKX chainIndex 196)",
+    research_timestamp: now(),
+    sources: evidence.length + recent.items.length,
+    primary_sources: primaryCount,
+    onchain_sources: covD.ok,
+  };
+  const findings = buildFindings({
+    symbol: asset.symbol, name: asset.name, checksVerified, checksTotal,
+    tokenPrice: econ.price ?? null, underlyingPrice: spot.price !== null ? spot.price.toFixed(2) : null,
+    premiumBps, marketStatus: spot.price !== null ? mktStatus : null, refTs,
+    top10: top10num, top5, holders: onchain.holders_count ?? null,
+    liquidityRaw: liqRaw, venueCount: poolRows.length,
+    backingConfidence: backing.confidence ?? "UNKNOWN",
+    custodianNamed: !!detectNamedCustodian((Array.isArray(backing.evidence) ? backing.evidence : []).map((e: AnyObj) => String(e.excerpt ?? ""))),
+    contradictions: contradictions.length,
+    firstContradiction: contradictions.length > 0 ? String(contradictions[0].issue).slice(0, 160) : null,
+    unknowns, evidenceCount: evidence.length,
+  });
   // HIGH means: at least 4 of 7 OKX endpoints agree + docs present +
   // independent tokenlist confirms the contract (fresh, not stale) + no
   // contradictions. Issuer claims alone can never produce HIGH, and neither
   // can a thin or stale source set.
-  const covGate = okxCoverage(Array.isArray(onchain.missing) ? onchain.missing : []);
+  // (covGate kept for the overall-grade gate below; covD above feeds the dossier.)
+  const covGate = covD;
   const overall =
     onchain.onchain === null ? "LOW"
     : covGate.ok >= 4 && onchain.confidence !== "LOW" && backing.confidence !== "UNKNOWN" && tlListed && contradictions.length === 0 ? "HIGH"
@@ -1332,6 +1868,43 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     ...(recent.note ? { recent_note: recent.note } : {}),
     contradictions,
     unknowns, evidence,
+    // ---- Dossier product sections (Service 2) ----
+    service: "research",
+    research_snapshot: snapshot,
+    executive_findings: findings,
+    identity,
+    backing_detail: backingDetail,
+    onchain_analysis: {
+      supply: onchain.supply ?? null,
+      holders_count: onchain.holders_count ?? null,
+      top_holders: topHolders,
+      top10_percent: top10num,
+      top5_percent: top5,
+      largest_holder_percent: topHolders.length > 0 ? Number(topHolders[0].percent) : null,
+      known_issuer_treasury_addresses: null,
+      holder_history: null,
+      holder_history_note: "Historical holder concentration unavailable — no time-series holder source in this version.",
+      transfer_count_24h: econ.txs24H ?? null,
+      transfer_activity: onchain.recent_trades ?? null,
+      contracts: onchain.contracts ?? [],
+      explorer: onchain.explorer ?? null,
+      contract_crosscheck: onchain.contract_crosscheck ?? null,
+      tokenlist_check: onchain.tokenlist_check ?? null,
+      observations: onchain.observations ?? [],
+      missing: onchain.missing ?? [],
+    },
+    liquidity_detail: {
+      venues: poolRows.map((p: AnyObj) => ({ venue: String(p.label ?? "Pool"), liquidity_usd: p.liquidity_usd ?? null })),
+      volume_24h: econ.volume24H ?? null,
+      volume_7d: null,
+      volume_7d_note: "7d volume unavailable — no 7d volume source in this version.",
+      price_impact: priceImpact,
+      venue_count: poolRows.length,
+    },
+    price_relationship: priceRelationship,
+    risks_detailed: risksDetailed,
+    unknowns_mandatory: unknowns,
+    source_register: sourceRegister,
     confidence: { overall, identity: "HIGH", onchain: onchain.confidence ?? "UNKNOWN", backing: backing.confidence ?? "UNKNOWN" },
     data_timestamp: now(),
   };
@@ -1352,12 +1925,37 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   ];
   report.receipt = `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · ${segs.join(" + ")} ${L("rpt_in")} ${secs}s · data ${report.data_timestamp}`;
   report.summary = summarizeResearch(report);
-  if (focus === "risks") {
+  if (focus === "backing") {
+    // Backing focus: collateral evidence only — no market sections returned.
     return {
+      service: "research",
       found: true, focus, lang,
       ...(fallbackNote ? { lang_note: fallbackNote } : {}),
       asset: report.asset,
-      risks: report.risks, unknowns: report.unknowns, confidence: report.confidence,
+      identity,
+      underlying_security: asset.underlying_asset,
+      backing_detail: backingDetail,
+      evidence: report.evidence,
+      unknowns: report.unknowns,
+      unknowns_mandatory: unknowns,
+      source_register: sourceRegister,
+      confidence: report.confidence,
+      summary: `## ${asset.symbol} — backing evidence\n- Issuer claim: ${cutWords(String(backing.issuer_claim ?? "none extracted"), 220)}\n- Independently verified: ${verifiedList.length} item(s) · On-chain observations: ${onchainObs.length}\n- Reserve amount: UNKNOWN — reconciliation not possible (see reconciliation note).`,
+      receipt: report.receipt,
+      note: "Backing focus: onchain skipped by focus (supply null for that reason); collateral evidence only.",
+      data_timestamp: report.data_timestamp,
+    };
+  }
+  if (focus === "risks") {
+    return {
+      service: "research",
+      found: true, focus, lang,
+      ...(fallbackNote ? { lang_note: fallbackNote } : {}),
+      asset: report.asset,
+      risks: report.risks, risks_detailed: risksDetailed,
+      unknowns: report.unknowns, unknowns_mandatory: unknowns,
+      source_register: sourceRegister, evidence_count: evidence.length,
+      confidence: report.confidence,
       summary: `## ${report.asset.symbol} — top risks\n` + (report.risks as Risk[]).map((x) => `- **${x.category}** (${x.severity}): ${x.reason}`).join("\n"),
       receipt: report.receipt,
       note: "Risks focus: full data gathered, only risk sections returned.",
@@ -1365,6 +1963,48 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     };
   }
   return report;
+}
+
+// ---- Service 3: compare — normalized side-by-side table ----
+// One row per metric, one column per asset; every cell carries value,
+// timestamp and source. Observations only — never a winner.
+export function buildComparisonTable(reports: AnyObj[]): AnyObj[] {
+  const cell = (r: AnyObj, value: unknown, source: string): AnyObj => ({
+    value: value ?? null, timestamp: r.data_timestamp ?? null, source,
+  });
+  const specs: { category: string; metric: string; get: (r: AnyObj) => AnyObj }[] = [
+    { category: "identity", metric: "underlying", get: (r) => cell(r, r.asset?.name?.replace(/ xStock$/i, "") ?? r.identity?.identity?.underlying_asset ?? null, "uzam registry") },
+    { category: "identity", metric: "issuer", get: (r) => cell(r, r.issuer?.name ?? null, "uzam registry") },
+    { category: "identity", metric: "network", get: (r) => cell(r, "X Layer (chainId 196)", "uzam registry") },
+    { category: "identity", metric: "contract", get: (r) => cell(r, r.identity?.identity?.contract_address ?? null, "xStocks product data (issuer-published)") },
+    { category: "legal", metric: "instrument_type", get: (r) => cell(r, r.asset?.asset_type ?? null, "uzam registry") },
+    { category: "legal", metric: "shareholder_rights", get: (r) => cell(r, "UNKNOWN — confirm in Final Terms", "uzam identify") },
+    { category: "legal", metric: "official_docs", get: (r) => cell(r, `${(r.issuer?.documents ?? []).length} link(s) on file`, "uzam registry") },
+    { category: "backing", metric: "model", get: (r) => cell(r, "tokenized-equity claim per issuer (claim, not verified)", "uzam backing focus") },
+    { category: "backing", metric: "reserve_evidence", get: (r) => cell(r, ((r.backing_detail?.attestation_links ?? []).length > 0 ? `${(r.backing_detail.attestation_links as unknown[]).length} attestation link(s)` : "none found"), "uzam backing focus") },
+    { category: "backing", metric: "custodian", get: (r) => cell(r, r.backing_detail?.custodian ?? null, "uzam backing focus") },
+    { category: "backing", metric: "verification_status", get: (r) => cell(r, r.confidence?.backing ?? null, "uzam report confidence") },
+    { category: "onchain", metric: "supply", get: (r) => cell(r, r.onchain_analysis?.supply?.circulating ?? null, "OKX price-info") },
+    { category: "onchain", metric: "holders", get: (r) => cell(r, r.onchain_analysis?.holders_count ?? null, "OKX price-info") },
+    { category: "onchain", metric: "top10_pct", get: (r) => cell(r, r.onchain_analysis?.top10_percent ?? null, "OKX advanced-info") },
+    { category: "onchain", metric: "top5_pct", get: (r) => cell(r, r.onchain_analysis?.top5_percent ?? null, "OKX holder list (calculated)") },
+    { category: "onchain", metric: "transfers_24h", get: (r) => cell(r, r.onchain_analysis?.transfer_count_24h ?? null, "OKX price-info") },
+    { category: "liquidity", metric: "venues", get: (r) => cell(r, r.liquidity_detail?.venue_count ?? null, "OKX top-liquidity") },
+    { category: "liquidity", metric: "liquidity_usd", get: (r) => cell(r, r.economics?.liquidity ?? null, "OKX price-info") },
+    { category: "liquidity", metric: "volume_24h_usd", get: (r) => cell(r, r.economics?.volume24H ?? null, "OKX price-info") },
+    { category: "liquidity", metric: "impact_usd_10k", get: (r) => cell(r, r.liquidity_detail?.price_impact?.venues?.[0]?.estimates?.usd_10000 ?? null, "uzam calculation") },
+    { category: "price", metric: "token_price", get: (r) => cell(r, r.economics?.price ?? null, "OKX market/price") },
+    { category: "price", metric: "reference_price", get: (r) => cell(r, r.price_relationship?.reference_price ?? null, "Yahoo quote (unverified)") },
+    { category: "price", metric: "diff_bps", get: (r) => cell(r, r.price_relationship?.difference_bps ?? null, "uzam calculation") },
+    { category: "documentation", metric: "proof_of_reserves", get: (r) => cell(r, ((r.backing_detail?.attestation_links ?? []).length > 0 ? "link(s) found" : "none found"), "uzam backing focus") },
+    { category: "documentation", metric: "onchain_verified", get: (r) => cell(r, r.onchain_analysis?.tokenlist_check?.listed === true ? "contract listed on tokenlist" : "not confirmed", "xStocks tokenlist") },
+    { category: "unknown", metric: "open_questions", get: (r) => cell(r, (r.unknowns as unknown[] | undefined)?.length ?? null, "uzam report") },
+  ];
+  return specs.map((s) => {
+    const values: Record<string, AnyObj> = {};
+    for (const r of reports) values[r.asset.symbol] = s.get(r);
+    return { category: s.category, metric: s.metric, values };
+  });
 }
 
 // ---- compare_assets: structured multi-asset comparison, evidence per row ----
@@ -1488,6 +2128,8 @@ export async function compareAssets(symbols: string[], opts?: { price?: string; 
     .sort((a, b) => b.tokens.length - a.tokens.length || b.max_percent - a.max_percent);
   const out: AnyObj = {
     compared: rows.map((r) => r.symbol), rows, leaders, shared_holders, lang,
+    service: "compare",
+    comparison_table: buildComparisonTable(found),
     ...(fallbackNote ? { lang_note: fallbackNote } : {}),
     ...(duplicates_dropped > 0 ? { duplicates_dropped, duplicates_note: `${duplicates_dropped} duplicate input(s) collapsed (case-insensitive).` } : {}),
     ...(dropped.length > 0 ? { dropped_symbols: dropped, dropped_note: `Only the first 4 were compared; ignored: ${dropped.join(", ")}.` } : {}),

@@ -16,10 +16,10 @@ and calls research tools. Uzam gathers and cites — the agent reasons.
 
 | Route | Price | What it does |
 |---|---|---|
-| `POST /api/identify` | $0.15 | Name, issuer, underlying, chain, docs + live quote. |
-| `GET /api/research/preview?symbol=AAPLx` | $0.15 | Identity only, zero fetches. |
-| `POST /api/research` | $0.25 | Full dossier (focus: full/issuer/backing/risks, lang: en/zh/es/fr). |
-| `POST /api/compare` | $0.50 | Up to 4 assets, per-category leaders. |
+| `POST /api/identify` | $0.08 | 60-second identity check: identity, verification checks, official sources, unknowns. No market data. |
+| `GET /api/research/preview?symbol=AAPLx` | $0.08 | Identity only, zero fetches. |
+| `POST /api/research` | $0.25 | Evidence dossier: snapshot, findings, backing (claim vs verified vs on-chain vs unknown), liquidity + calculated impact, 10 risks, source register (focus: full/issuer/backing/risks, lang: en/zh/es/fr). |
+| `POST /api/compare` | $0.50 | Side-by-side table for up to 4 assets, every cell with value + timestamp + source. Never a winner. |
 
 Unpaid calls get `402 Payment Required`. Without `PAY_TO_ADDRESS` + OKX creds the routes run free (never half-enforced). Discovery: `GET /.well-known/x402`, `GET /openapi.json`, `GET /llms.txt`, `GET /install`, `GET /api/receipts`, `GET /info`., NFLXx, AMDx, COINx, HOODx, AVGOx, JPMx, Vx, PLTRx
 
@@ -27,11 +27,11 @@ Unpaid calls get `402 Payment Required`. Without `PAY_TO_ADDRESS` + OKX creds th
 
 | Tool | What it does |
 |---|---|
-| `identify_asset` | Resolve symbol → name, issuer, underlying, chain, official docs. Never guesses. |
+| `identify_asset` | 60-second identity check: identity, verification checks, official sources, unknowns. No market data. Use before deeper research. |
 | `analyze_onchain` | Contract resolution + price, supply, holders, concentration, volume, liquidity via OKX Onchain OS. Partial + `missing[]` when unavailable. |
 | `analyze_backing` | Reads issuer pages live, quotes backing passages with Tier-1 evidence, separates CLAIM from FACT. |
-| `research_asset` | Full report: identity, backing, onchain, 9-category risks, news, contradictions, unknowns, confidence. Optional `focus`: `full` / `issuer` / `backing` / `risks`. |
-| `compare_assets` | 1–4 asset table + per-category leaders with reasons (ties reported, never forced). Never a bald verdict. |
+| `research_asset` | Evidence dossier: snapshot, findings, backing split, on-chain, liquidity + calculated impact, 10 risks, source register. Optional `focus`: `full` / `issuer` / `backing` / `risks`. |
+| `compare_assets` | Side-by-side table for 1–4 assets, every cell with value + timestamp + source. Observations only, never a winner. |
 
 ## Research philosophy
 
@@ -58,7 +58,7 @@ npm run dev            # or: npm run build && npm start
 ```
 
 `GET /health` for liveness, `POST /mcp` for the MCP endpoint.
-Set `ALLOWED_HOSTS` to your public hostname when deploying (see `render.yaml`).
+Set `ALLOWED_HOSTS` to your public hostname when deploying (Railway: service Variables).
 
 ## Layout
 

@@ -9,7 +9,7 @@ import * as z from "zod/v4";
 import registryJson from "./data/xlayer-assets.json" with { type: "json" };
 import { OKXOnchainAdapter, loadOkxConfig, XLAYER_CHAIN_INDEX } from "./okx/adapter.js";
 import { fetchPage, extractPassages, BACKING_KEYWORDS } from "./research/provider.js";
-import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios, fetchLiveQuote, toNum } from "./research/engines.js";
+import { researchAsset, compareAssets, detectNamedCustodian, fmtMoney, tradeRatios, toNum, buildIdentity } from "./research/engines.js";
 import { normalizeLang, t, langFallbackNote } from "./research/i18n.js";
 import { mountPaidRoutes, PRICE_RESEARCH, PRICE_COMPARE, PRICE_IDENTIFY, PRICE_PREVIEW } from "./payments/x402.js";
 
@@ -85,7 +85,7 @@ type SearchHit = {
   liquidity?: unknown; marketCap?: unknown; change?: unknown;
 };
 
-// ---- MCP factory: fresh server per request (stateless, Render-friendly) ----
+// ---- MCP factory: fresh server per request (stateless, host-friendly) ----
 const handler = createMcpHandler(() => {
   const server = new McpServer({ name: "uzam", version: "0.1.0" });
 
@@ -93,81 +93,16 @@ const handler = createMcpHandler(() => {
     "identify_asset",
     {
       description:
-        "Identify an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx). Returns issuer, underlying asset, chain 196 info, official website and documents, plus a live price quote when OKX is reachable. Ask the user for lang (en, zh, es, fr) — required. Use this before any deeper research.",
+        "60-second identity check for an X Layer tokenized stock/ETF (e.g. AAPLx, TSLAx, NVDAx, SPYx): what the token is, issuer, underlying, network, contract, explicit verification checks, official sources and unknowns. Registry only — no market data, no live quotes. Ask the user for lang (en, zh, es, fr) — required. Use this before any deeper research; use research_asset for the evidence dossier.",
       inputSchema: SymbolInput,
     },
     async ({ symbol, lang }) => {
-      const asset = findAsset(symbol);
-      const langCode = normalizeLang(lang);
-      const L = (k: string): string => t(langCode, k);
-      const live = asset ? await fetchLiveQuote(asset.symbol) : null;
-      if (!asset) {
-        const supported = registry.assets.map((a) => a.symbol);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  found: false,
-                  symbol: symbol.trim().toUpperCase(),
-                  lang: langCode,
-                  ...(langFallbackNote(lang, langCode) ? { lang_note: langFallbackNote(lang, langCode) } : {}),
-                  uncertainty: L("id_unknown"),
-                  supported_symbols: supported,
-                  tokenlist: registry.tokenlist,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
+      try {
+        return { content: [{ type: "text", text: JSON.stringify(buildIdentity(symbol, { lang }), null, 2) }] };
+      } catch (e) {
+        console.error("identify_asset failed:", e instanceof Error ? e.message : String(e));
+        return { content: [{ type: "text", text: "Identity check failed with an internal error. Retry." }], isError: true as const };
       }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                found: true,
-                name: asset.name,
-                symbol: asset.symbol,
-                lang: langCode,
-                ...(langFallbackNote(lang, langCode) ? { lang_note: langFallbackNote(lang, langCode) } : {}),
-                summary: `${asset.symbol} — ${asset.name} (${asset.asset_type} · ${asset.issuer} · ${asset.underlying_asset}; ${L("id_backing_note")}). Chain ${asset.chains.join(", ")} (${asset.chainIds.join(", ")}). ${L("id_summary_of")}: ${asset.official_website}`,
-                asset_type: asset.asset_type,
-                issuer: asset.issuer,
-                issuer_legal: asset.issuer_legal ?? null,
-                underlying_asset: asset.underlying_asset,
-                underlying: asset.underlying ?? null,
-                chains: asset.chains,
-                chainIds: asset.chainIds,
-                chain_info: {
-                  rpc: registry.chain.rpc ?? null,
-                  explorer: registry.chain.explorer ?? null,
-                },
-                product_page: asset.product_page ?? null,
-                issuer_published_contract: asset.issuer_published_contract ?? null,
-                issuer_contract_explorer: asset.issuer_published_contract
-                  ? `https://www.okx.com/web3/explorer/xlayer/token/${asset.issuer_published_contract}`
-                  : null,
-                contract_addresses: asset.contract_addresses,
-                contracts_note:
-                  asset.contract_addresses.length === 0
-                    ? L("id_no_contract")
-                    : undefined,
-                official_website: asset.official_website,
-                official_documents: asset.official_documents,
-                tokenlist_raw: registry.tokenlist_raw ?? null,
-                live: live ?? { available: false, reason: "not_attempted" },
-              },
-              null,
-              2
-            ),
-          },
-        ],
-      };
     }
   );
 
@@ -525,7 +460,7 @@ const handler = createMcpHandler(() => {
     "research_asset",
     {
       description:
-        "Full evidence-backed research report on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): identity, issuer, backing with quoted evidence, onchain data via OKX, 9-category risk analysis, unknowns and confidence. Ask the user for lang (en, zh, es, fr) � required (headers/labels translated, quotes stay in original language). Use this when the user wants to understand an asset beyond basic market data. Set focus to narrow the work: issuer (identity only), backing (documents only), risks (risk sections only), full (everything).",
+        "Evidence dossier on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): research snapshot, 3-7 executive findings, backing split into issuer claim vs independently verified vs on-chain observation vs unknown, on-chain analysis, liquidity with calculated price impact, price relationship, 10 risk categories, mandatory unknowns and a source register. Ask the user for lang (en, zh, es, fr) — required (headers/labels translated, quotes stay in original language). Focus narrows the dossier: issuer (identity/legal only), backing (collateral evidence only), risks (risk sections only), full (everything). For a 60-second identity check use identify_asset; for side-by-side use compare_assets.",
       inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(TICKER_RE), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq }),
     },
     async ({ symbol, focus, lang }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string }) => {
@@ -542,7 +477,7 @@ const handler = createMcpHandler(() => {
     "compare_assets",
     {
       description:
-        "Compare 2-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]) across backing evidence, liquidity, holder concentration, risks and confidence. Ask the user for lang (en, zh, es, fr) � required (headers/labels translated, quotes stay in original language). Returns a structured table plus per-category leaders with reasons — never a bald recommendation.",
+        "Side-by-side comparison table for 1-4 X Layer tokenized stocks/ETFs (e.g. [\"AAPLx\", \"TSLAx\"]): identity, legal/structure, backing, on-chain, liquidity, price, documentation and unknowns per asset, one row per metric with value, timestamp and source, plus per-category leaders with reasons. Observations only — never an overall winner or recommendation. Ask the user for lang (en, zh, es, fr) — required (headers/labels translated, quotes stay in original language).",
       inputSchema: z.object({ symbols: z.array(z.string().trim().min(1).max(20).regex(TICKER_RE)).min(1).max(4), lang: LangReq }),
     },
     async ({ symbols, lang }: { symbols: string[]; lang?: string }) => {
@@ -565,7 +500,7 @@ const rawHosts = (process.env.ALLOWED_HOSTS ?? "")
   .filter((h) => /^[a-z0-9.-]+$/.test(h));
 
 if (process.env.NODE_ENV === "production" && rawHosts.length === 0) {
-  throw new Error("ALLOWED_HOSTS must be set in production (e.g. uzam-m3pi.onrender.com)");
+  throw new Error("ALLOWED_HOSTS must be set in production (e.g. uzam-production-95f9.up.railway.app)");
 }
 
 const app = rawHosts.length > 0

@@ -1,6 +1,6 @@
 // x402 paid routes — the cash register.
-// Discovery (identify) is FREE — it's the funnel. Depth is paid:
-// research (full report) $0.25, compare (up to 4 assets) $0.50 —
+// Discovery (identify $0.08, preview $0.08) is the cheap funnel. Depth is paid:
+// research (full dossier) $0.25, compare (up to 4 assets) $0.50 —
 // flat per route because the paywall allows one fixed price per path.
 // $0.25 anchors to comparable agent research APIs (Messari AI $0.25);
 // compare at $0.50 covers 2-4x the compute of one research call.
@@ -14,11 +14,11 @@ import { OKXFacilitatorClient } from "@okxweb3/x402-core";
 import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { loadOkxConfig } from "../okx/adapter.js";
-import { researchAsset, compareAssets, findAsset, supportedSymbols, fetchLiveQuote, chainMeta, tokenlistRaw } from "../research/engines.js";
+import { researchAsset, compareAssets, supportedSymbols, buildIdentity } from "../research/engines.js";
 
 const NETWORK = "eip155:196";
-export const PRICE_IDENTIFY = "$0.15";
-export const PRICE_PREVIEW = "$0.15";
+export const PRICE_IDENTIFY = "$0.08";
+export const PRICE_PREVIEW = "$0.08";
 export const PRICE_RESEARCH = "$0.25";
 export const PRICE_COMPARE = "$0.50";
 // Public receipts log: last 50 paid-route calls. No IPs, no wallet addresses —
@@ -69,7 +69,7 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
         {
           "POST /api/identify": {
             accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_IDENTIFY }],
-            description: "Uzam asset identifier on X Layer: issuer, underlying, chain info and official documents.",
+            description: "Uzam identity check on X Layer (under 1 minute): what the token is, issuer, underlying, network, contract, verification checks, official sources, unknowns. No market analysis.",
             mimeType: "application/json",
           },
           "GET /api/research/preview": {
@@ -79,12 +79,12 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
           },
           "POST /api/research": {
             accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_RESEARCH }],
-            description: "Uzam full RWA research report on one X Layer tokenized stock (identity, backing evidence, onchain, risks, unknowns).",
+            description: "Uzam evidence dossier on one X Layer tokenized stock: snapshot, findings, backing (claim vs verified vs on-chain vs unknown), on-chain, liquidity with calculated price impact, price relationship, 10 risk categories, source register. Focus: full/issuer/backing/risks.",
             mimeType: "application/json",
           },
           "POST /api/compare": {
             accepts: [{ scheme: "exact", network: NETWORK, payTo, price: PRICE_COMPARE }],
-            description: "Uzam side-by-side comparison of up to 4 X Layer tokenized stocks with per-category leaders.",
+            description: "Uzam side-by-side comparison table for up to 4 X Layer tokenized stocks: identity, legal, backing, on-chain, liquidity, price, documentation, unknowns per asset. Observations only, never a winner.",
             mimeType: "application/json",
           },
         },
@@ -144,6 +144,11 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       res.status(400).json({ ok: false, error: "invalid symbol: 1-20 ticker characters" });
       return;
     }
+    const l: unknown = req.body?.lang;
+    if (l !== undefined && (typeof l !== "string" || !LANG_RE.test(l.trim().toLowerCase()))) {
+      res.status(400).json({ ok: false, error: "invalid lang: en|zh|es|fr" });
+      return;
+    }
   }
   next();
 }
@@ -176,33 +181,10 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   };
 
   const runIdentify = async (req: Request, res: Response): Promise<void> => {
+    // Fast identity check: registry only, no fetches, no market analysis.
     const symbol = typeof req.body?.symbol === "string" ? req.body.symbol : "";
-    const asset = findAsset(symbol);
-    if (!asset) {
-      res.json({ ok: true, data: { found: false, symbol: symbol.trim().toUpperCase(), supported_symbols: supportedSymbols() } });
-      return;
-    }
-    const live = await fetchLiveQuote(asset.symbol);
-    const chain = chainMeta();
-    res.json({
-      ok: true,
-      data: {
-        found: true, name: asset.name, symbol: asset.symbol, asset_type: asset.asset_type,
-        issuer: asset.issuer, issuer_legal: asset.issuer_legal ?? null,
-        underlying_asset: asset.underlying_asset, underlying: asset.underlying ?? null,
-        chains: asset.chains, chainIds: asset.chainIds,
-        chain_info: { rpc: chain.rpc, explorer: chain.explorer },
-        contract_addresses: asset.contract_addresses,
-        official_website: asset.official_website, official_documents: asset.official_documents,
-        tokenlist_raw: tokenlistRaw(),
-        product_page: asset.product_page ?? null,
-        issuer_published_contract: asset.issuer_published_contract ?? null,
-        issuer_contract_explorer: asset.issuer_published_contract
-          ? `https://www.okx.com/web3/explorer/xlayer/token/${asset.issuer_published_contract}`
-          : null,
-        live,
-      },
-    });
+    const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
+    res.json({ ok: true, data: buildIdentity(symbol, { lang }) });
   };
 
   // Public errors stay generic; details go to server logs only.
@@ -237,9 +219,9 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       asset: "USDT0",
       routes: [
         { path: "POST /mcp", price: "$0.00", description: "Free: 5 agent tools (identify, onchain, backing, research, compare)." },
-        { path: "POST /api/identify", price: PRICE_IDENTIFY, description: "Resolve symbol to issuer, underlying, chain, docs." },
-        { path: "POST /api/research", price: PRICE_RESEARCH, description: "Full RWA report: identity, backing evidence, onchain, risks, unknowns." },
-        { path: "POST /api/compare", price: PRICE_COMPARE, description: "Side-by-side comparison of up to 4 assets with per-category leaders." },
+        { path: "POST /api/identify", price: PRICE_IDENTIFY, description: "60-second identity check: what the token is, verification checks, official sources, unknowns. No market data." },
+        { path: "POST /api/research", price: PRICE_RESEARCH, description: "Evidence dossier: snapshot, findings, backing (claim vs verified vs on-chain vs unknown), on-chain, liquidity + calculated price impact, 10 risks, source register." },
+        { path: "POST /api/compare", price: PRICE_COMPARE, description: "Side-by-side table for up to 4 assets: identity, legal, backing, on-chain, liquidity, price, docs, unknowns. Never a winner." },
         { path: "GET /api/research/preview?symbol=AAPLx", price: PRICE_PREVIEW, description: "Capped preview: identity only, no fetches." },
       ],
     });
@@ -247,16 +229,16 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
 
   app.get("/openapi.json", (req: Request, res: Response) => {
     const base = `${req.protocol}://${req.get("host")}`;
-    const symbolSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" } }, required: ["symbol"] };
-    const researchSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, focus: { type: "string", enum: ["full", "issuer", "backing", "risks"] } }, required: ["symbol"] };
-    const compareSchema = { type: "object", properties: { symbols: { type: "array", items: { type: "string" }, example: ["AAPLx", "TSLAx"] } }, required: ["symbols"] };
+    const symbolSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbol"] };
+    const researchSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, focus: { type: "string", enum: ["full", "issuer", "backing", "risks"] }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbol"] };
+    const compareSchema = { type: "object", properties: { symbols: { type: "array", items: { type: "string" }, example: ["AAPLx", "TSLAx"] }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbols"] };
     const asJson = (schema: unknown) => ({ content: { "application/json": { schema } } });
     res.json({
       openapi: "3.0.0",
       info: { title: "Uzam RWA Intelligence API", version: "0.1.0", description: "Evidence-backed research on xStocks tokenized equities (X Layer 196). Identify free, depth paid via x402." },
       servers: [{ url: base }],
       paths: {
-        "/api/identify": { post: { summary: `Asset identifier (${PRICE_IDENTIFY} via x402 when configured)`, requestBody: asJson(symbolSchema) } },
+        "/api/identify": { post: { summary: `Identity check, no market data (${PRICE_IDENTIFY} via x402 when configured)`, requestBody: asJson(symbolSchema) } },
         "/api/research": { post: { summary: `Full report (${PRICE_RESEARCH} via x402)`, requestBody: asJson(researchSchema) } },
         "/api/compare": { post: { summary: `Compare up to 4 (${PRICE_COMPARE} via x402)`, requestBody: asJson(compareSchema) } },
         "/api/research/preview": { get: { summary: `Capped preview, identity only (${PRICE_PREVIEW} via x402 when configured)` } },
@@ -268,7 +250,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   app.get("/llms.txt", (_req: Request, res: Response) => {
     res.type("text/plain").send(
       `# Uzam — RWA intelligence for xStocks on X Layer (chain 196)\n` +
-      `Paid (x402, USDT0 on X Layer): POST /api/identify (${PRICE_IDENTIFY}) → issuer, underlying, docs. POST /api/research (${PRICE_RESEARCH}) → full report with backing evidence, onchain, 9 risks, unknowns, receipt. POST /api/compare (${PRICE_COMPARE}) → up to 4 assets, per-category leaders. GET /api/research/preview?symbol=AAPLx (${PRICE_PREVIEW}, identity only).\n` +
+      `Paid (x402, USDT0 on X Layer): POST /api/identify (${PRICE_IDENTIFY}) → 60-second identity check, verification checks, unknowns. POST /api/research (${PRICE_RESEARCH}) → evidence dossier with backing evidence, onchain, 10 risks, source register. POST /api/compare (${PRICE_COMPARE}) → side-by-side table, up to 4 assets. GET /api/research/preview?symbol=AAPLx (${PRICE_PREVIEW}, identity only).\n` +
       `MCP (free): POST /mcp → tools identify_asset, analyze_onchain, analyze_backing, research_asset, compare_assets.\n` +
       `Supported: ${supportedSymbols().join(", ")}. Never guesses; unknowns stated, never "safe".\n`
     );
