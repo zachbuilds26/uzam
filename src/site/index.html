@@ -1,484 +1,286 @@
 <!doctype html>
+<!-- Production deployment: Railway -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Uzam — RWA intelligence for xStocks your agent can cite</title>
-<meta name="description" content="Uzam researches xStocks tokenized equities on X Layer: quoted backing evidence, onchain holders and liquidity, 9-category risks, SEC filings — and states what it cannot prove instead of guessing. MCP + x402 API. Listed on OKX.AI." />
-<meta property="og:title" content="Uzam — RWA intelligence for xStocks" />
-<meta property="og:description" content="One call: backing evidence, premium, holders, risks, unknowns. Never guesses. Live on X Layer (196)." />
-<meta name="theme-color" content="#000000" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z' fill='none' stroke='%2352FF00' stroke-width='10'/%3E%3Ccircle cx='50' cy='50' r='12' fill='%2352FF00'/%3E%3C/svg%3E" />
+<title>Uzam — Clear research for tokenized assets</title>
+<meta name="description" content="Uzam researches tokenized assets on X Layer with sourced evidence, live onchain data, risks, and unknowns." />
+<meta property="og:title" content="Uzam — Clear research for tokenized assets" />
+<meta property="og:description" content="Sourced research for tokenized assets on X Layer. No guessing." />
+<meta name="theme-color" content="#0f2623" />
 <style>
-  /* Somnus grammar, Uzam palette: black + signal greens.
-     #52FF00 primary, #66FF00 hover, #38BD00 deep. Black ink on green.
-     Thick white frames, hard offset slabs, square corners, grid backdrop. */
-  :root {
-    --background: #000000;
-    --background-deep: #000000;
-    --surface: #111111;
-    --raised: #1a1a1a;
-    --hover: #222222;
-    --line: #ffffff;
-    --ink: #ffffff;
-    --muted: #9c9c9c;
-    --faint: #6b6b6b;
-    --accent: #52FF00;
-    --accent-hover: #66FF00;
-    --accent-deep: #38BD00;
-    --accent-ink: #000000;
-  }
-  * { box-sizing: border-box; }
-  html { min-height: 100%; background: var(--background); scroll-behavior: smooth; }
-  body {
-    min-height: 100vh; margin: 0; background: var(--background); color: var(--ink);
-    font-family: "Space Grotesk", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-  }
-  h1, h2, h3 { font-family: "Syne", Arial, sans-serif; margin: 0; letter-spacing: -0.045em; }
-  p { margin: 0; }
-  a { color: inherit; }
-  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  ::selection { background: var(--accent); color: var(--accent-ink); }
-  section[id] { scroll-margin-top: 1rem; }
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-  .frame { border: 2px solid var(--line); }
-  .slab { box-shadow: 4px 4px 0 0 var(--ink); }
+:root {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-ui: 'Space Grotesk', system-ui, sans-serif;
+  --bg: #0f2623;
+  --bg-2: #10352f;
+  --bg-3: #123d35;
+  --surface: #143f37;
+  --surface-2: #0d211f;
+  --ink: #9decce;
+  --ink-2: #aac9c2;
+  --muted: #7fa49c;
+  --faint: #52756e;
+  --line: rgba(170, 201, 194, .28);
+  --line-2: rgba(170, 201, 194, .17);
+  --accent: #9decce;
+  --on-accent: #0f2623;
+  --container: 1180px;
+  --gutter: clamp(20px, 5vw, 40px);
+  --section-y: clamp(4.5rem, 8vw, 8rem);
+  --r-sm: 8px;
+  --r: 14px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .16);
+  --shadow: 0 1px 3px rgba(0, 0, 0, .18), 0 24px 50px -30px rgba(0, 0, 0, .48);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, .20), 0 40px 80px -40px rgba(0, 0, 0, .58);
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
 
-  .grid-fade {
-    background-image:
-      linear-gradient(to right, rgba(82,255,0,0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(82,255,0,0.06) 1px, transparent 1px);
-    background-size: 42px 42px;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; background: var(--bg); }
+body { font-family: var(--font-ui); font-weight: 500; background: var(--bg); color: var(--ink); line-height: 1.6; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: hidden; }
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+button { background: none; border: none; cursor: pointer; }
+:where(a, button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+::selection { background: var(--accent); color: var(--on-accent); }
+.container { width: 100%; max-width: var(--container); margin: 0 auto; padding-inline: var(--gutter); }
 
-  /* ── splash ── */
-  #splash {
-    position: fixed; inset: 0; z-index: 9999;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--background);
-    transition: opacity 300ms ease;
-  }
-  #splash.done { opacity: 0; pointer-events: none; }
-  #splash .row { display: flex; align-items: center; gap: 12px; overflow: hidden; }
-  #splash .word {
-    font-family: "Syne", Arial, sans-serif; font-size: 22px; font-weight: 600;
-    letter-spacing: -0.03em; white-space: nowrap; overflow: hidden;
-    max-width: 0; opacity: 0; transition: max-width 500ms ease, opacity 300ms ease;
-  }
-  #splash.typing .word { max-width: 250px; opacity: 1; }
-  #splash .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+.eyebrow { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-2); font: 600 .72rem var(--font-ui); letter-spacing: .15em; text-transform: uppercase; }
+.eyebrow::before, .eyebrow::after { content: ''; width: 22px; height: 1px; background: var(--line); }
+.eyebrow::before { display: none; }
+.eyebrow--center::before { display: block; }
+.display, h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--ink); letter-spacing: -.022em; }
+.display { line-height: 1.02; font-variation-settings: 'opsz' 48; }
+h1.display { font-size: clamp(2.8rem, 6.5vw, 5.4rem); }
+h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
+.lead { max-width: 44ch; color: var(--ink-2); font: 500 clamp(1.04rem, 1.4vw, 1.2rem)/1.55 var(--font-ui); }
 
-  /* ── header ── */
-  header.bar {
-    position: sticky; top: 0; z-index: 30;
-    background: rgba(0,0,0,0.92); backdrop-filter: blur(8px);
-    border-bottom: 2px solid var(--line);
-  }
-  .bar-in { max-width: 1120px; margin: 0 auto; padding: 0 20px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .wordmark { display: inline-flex; align-items: center; gap: 8px; font-family: "Syne", Arial, sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.03em; text-decoration: none; }
-  .wordmark .hex { width: 22px; height: 22px; flex: none; }
-  nav.links { display: flex; align-items: center; gap: 22px; font-size: 12px; font-weight: 500; color: var(--muted); }
-  nav.links a { text-decoration: none; padding: 8px 0; }
-  nav.links a:hover { color: var(--accent); }
-  nav.links a:focus { outline: none; }
-  nav.links a:focus-visible { outline: none; color: var(--accent); }
-  .bar-cta { display: flex; align-items: center; gap: 10px; }
-  .bar-link { font-size: 12px; font-weight: 600; color: var(--ink); text-decoration: none; padding: 8px 0; }
-  .bar-link:hover { color: var(--accent); }
-  @media (max-width: 720px) { nav.links .hide-sm { display: none; } }
+/* Werk's visual rhythm: a slim announcement strip, sticky wordmark nav, and a quiet menu panel. */
+.topbar { position: relative; z-index: 51; background: var(--bg-2); color: var(--ink-2); border-bottom: 1px solid var(--line-2); }
+.topbar-inner { height: 40px; display: flex; align-items: center; justify-content: center; }
+.topbar-link { display: inline-flex; align-items: center; gap: 12px; font: 500 .78rem var(--font-ui); }
+.topbar-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); }
+.topbar-cta { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 600; }
+.topbar-cta span { transition: transform .25s var(--ease); }
+.topbar-link:hover .topbar-cta span { transform: translateX(3px); }
+.site-header { position: relative; z-index: 50; background: var(--bg); }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.header-inner { height: 84px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.wordmark { display: inline-flex; align-items: center; gap: .46em; color: var(--ink); font: 600 1.55rem/1 var(--font-display); letter-spacing: -.02em; }
+.hex { width: 1.35em; height: 1.35em; }
+.primary-nav { display: none; }
+.header-action { display: inline-flex; align-items: center; justify-content: center; gap: .5em; padding: 11px 22px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink); font: 600 .92rem var(--font-ui); transition: transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease); }
+.header-action::after { content: '↗'; transition: transform .25s var(--ease); }
+.header-action:hover { background: var(--bg-2); border-color: var(--line); transform: translateY(-1px); }
+.header-action:hover::after { transform: translateX(3px); }
+.menu-toggle { width: 50px; height: 50px; display: grid; place-items: center; color: var(--ink); border-radius: var(--r-sm); font-size: 1.3rem; line-height: 1; transition: background .2s var(--ease); }
+.menu-toggle:hover { background: var(--bg-2); }
+.menu-panel { display: none; position: absolute; left: 0; right: 0; top: 100%; background: var(--surface-2); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+.site-header.menu-open .menu-panel { display: block; animation: menu-in .28s var(--ease); }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.menu-panel-inner { padding: 22px var(--gutter) 26px; max-width: var(--container); margin: 0 auto; }
+.menu-label { margin-bottom: 15px; color: var(--muted); font: 600 .7rem var(--font-ui); letter-spacing: .15em; text-transform: uppercase; }
+.menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.menu-item { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 18px 20px; background: var(--surface); transition: background .2s var(--ease); }
+.menu-item:hover { background: var(--bg-3); }
+.menu-item strong { color: var(--ink); font: 600 1rem/1.15 var(--font-display); }
+.menu-item small { max-width: 25ch; color: var(--muted); font: 500 .8rem/1.4 var(--font-ui); }
+.menu-item b { position: absolute; top: 17px; right: 18px; color: var(--muted); font-weight: 400; transition: transform .2s var(--ease), color .2s var(--ease); }
+.menu-item:hover b { color: var(--ink); transform: translateX(3px); }
+.menu-panel .header-action { margin-top: 18px; }
 
-  /* ── buttons ── */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px 20px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
-    border: 2px solid var(--line); background: transparent; color: var(--ink);
-    box-shadow: 4px 4px 0 0 var(--ink);
-    transition: transform 120ms ease, box-shadow 120ms ease, background-color 160ms ease;
-  }
-  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--ink); background: var(--surface); }
-  .btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
-  .btn svg { width: 16px; height: 16px; flex: none; }
-  .btn-primary {
-    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
-    box-shadow: 4px 4px 0 0 var(--ink);
-  }
-  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: 6px 6px 0 0 var(--ink); }
-  .btn-primary:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
-  .btn-sm { padding: 10px 14px; font-size: 12px; }
-  .btn[disabled] { opacity: 0.55; cursor: wait; transform: none; }
+/* Werk-style centered hero with a real-looking product surface, retaining Uzam's palette and copy. */
+.hero { position: relative; padding: clamp(1.5rem, 3vw, 2.75rem) 0 clamp(3rem, 6vw, 5rem); text-align: center; overflow: hidden; }
+.hero::before, .hero::after { content: ''; position: absolute; z-index: -1; border-radius: 999px; filter: blur(46px); pointer-events: none; }
+.hero::before { width: 34vw; height: 26vw; left: -12vw; top: 6%; background: rgba(78, 173, 146, .13); }
+.hero::after { width: 28vw; height: 26vw; right: -8vw; bottom: 14%; background: rgba(157, 236, 206, .10); }
+.hero-inner { display: flex; flex-direction: column; align-items: center; gap: clamp(2.4rem, 5vw, 3.7rem); }
+.hero-copy-wrap { display: flex; flex-direction: column; align-items: center; max-width: 880px; }
+.hero-title { margin-top: 18px; }
+.hero-title em { color: var(--muted); font-style: normal; }
+.hero-sub { margin-top: 22px; max-width: 47ch; }
+.hero-actions { display: flex; flex-wrap: nowrap; justify-content: center; gap: 12px; margin-top: 28px; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: .55em; padding: 13px 22px; border: 1px solid transparent; border-radius: var(--r-sm); background: var(--accent); color: var(--on-accent); font: 600 .94rem var(--font-ui); white-space: nowrap; transition: transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease), color .25s var(--ease), box-shadow .25s var(--ease); }
+.button:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.button::first-letter { color: inherit; }
+.button.secondary { background: transparent; border-color: var(--line); color: var(--ink); }
+.button.secondary:hover { background: var(--bg-2); border-color: var(--ink); }
+.button .arrow { transition: transform .25s var(--ease); }
+.button:hover .arrow { transform: translateX(3px); }
+.hero-demo { width: 100%; max-width: 920px; }
+.preview { position: relative; width: 100%; padding: clamp(12px, 2vw, 20px) clamp(8px, 1.8vw, 18px) 0; text-align: left; }
+.preview::before, .preview::after { content: ''; position: absolute; z-index: -1; border-radius: 999px; filter: blur(28px); }
+.preview::before { width: 34%; height: 42%; left: -1%; top: 7%; background: rgba(78, 173, 146, .22); }
+.preview::after { width: 30%; height: 35%; right: 0; bottom: 7%; background: rgba(157, 236, 206, .16); }
+.preview-window { overflow: hidden; border: 1px solid var(--line); border-radius: clamp(18px, 2.8vw, 26px); background: rgba(18, 61, 53, .94); box-shadow: var(--shadow-lg); }
+.preview-bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 17px; border-bottom: 1px solid var(--line); background: rgba(13, 33, 31, .76); }
+.preview-dots { display: inline-flex; gap: 5px; }
+.preview-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.preview-dots i:first-child { background: var(--accent); }
+.preview-word { margin-left: 3px; color: var(--ink); font: 600 1rem var(--font-display); letter-spacing: -.04em; }
+.preview-bar-title { color: var(--muted); font: 500 .75rem var(--font-ui); }
+.preview-status { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 8px; border-radius: var(--r-pill); background: rgba(157, 236, 206, .10); color: var(--ink-2); font: 600 .63rem var(--font-ui); letter-spacing: .05em; text-transform: uppercase; }
+.preview-status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.preview-body { display: grid; grid-template-columns: 205px 1fr; min-height: 340px; }
+.preview-side { display: flex; flex-direction: column; gap: 4px; padding: 17px 11px; border-right: 1px solid var(--line); background: rgba(13, 33, 31, .45); }
+.preview-side-label { display: flex; align-items: center; gap: 6px; margin: 2px 7px 6px; color: var(--muted); font: 600 .61rem var(--font-ui); letter-spacing: .13em; text-transform: uppercase; }
+.preview-side-label::before { content: '◈'; color: var(--accent); font-size: .72rem; }
+.preview-nav { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--muted); font: 500 .75rem var(--font-ui); }
+.preview-nav.active { background: var(--bg-3); color: var(--ink); box-shadow: var(--shadow-sm); }
+.preview-rule { height: 1px; margin: 11px 5px; background: var(--line); }
+.preview-file { display: flex; align-items: center; gap: 7px; padding: 7px 8px; color: var(--ink-2); font: 500 .69rem var(--font-ui); }
+.preview-file b { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; background: rgba(157, 236, 206, .12); color: var(--accent); font-size: .68rem; }
+.preview-main { min-width: 0; padding: 23px clamp(18px, 3.2vw, 34px) 20px; }
+.preview-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--muted); font: 600 .62rem var(--font-ui); letter-spacing: .14em; text-transform: uppercase; }
+.preview-eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(157, 236, 206, .12); }
+.preview-question { width: min(100%, 360px); margin: 9px 0 19px auto; padding: 13px 14px 10px; border-radius: 15px 15px 5px 15px; background: linear-gradient(145deg, #1a5a4c, #123c35); color: var(--ink); box-shadow: 0 12px 20px -16px rgba(0, 0, 0, .72); }
+.preview-question p { font: 500 clamp(.72rem, 1.35vw, .82rem)/1.45 var(--font-ui); }
+.preview-sent { display: flex; justify-content: flex-end; gap: 4px; margin-top: 7px; color: var(--muted); font: 500 .61rem var(--font-ui); }
+.preview-response { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 18px; }
+.preview-agent { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: var(--accent); color: var(--on-accent); font: 700 .75rem var(--font-ui); box-shadow: 0 8px 15px -11px var(--accent); }
+.preview-response p { padding-top: 2px; color: var(--ink-2); font: 500 .78rem/1.45 var(--font-ui); }
+.preview-scan { display: flex; gap: 4px; height: 12px; align-items: center; margin-top: 6px; }
+.preview-scan i { width: 4px; height: 4px; border-radius: 99px; background: var(--accent); animation: scan-dot 1.2s ease-in-out infinite; }
+.preview-scan i:nth-child(2) { animation-delay: .14s; } .preview-scan i:nth-child(3) { animation-delay: .28s; }
+.preview-report { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: rgba(15, 38, 35, .84); box-shadow: var(--shadow); }
+.preview-report-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: rgba(16, 53, 47, .72); color: var(--ink-2); font: 600 .67rem var(--font-ui); }
+.preview-report-head span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); } .preview-report-head small { color: var(--muted); font: 500 .62rem var(--font-ui); }
+.preview-cards { display: grid; gap: 1px; background: var(--line); }
+.preview-card { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--surface-2); }
+.preview-card-icon { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: rgba(157, 236, 206, .12); color: var(--accent); font-size: .72rem; }
+.preview-card-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; } .preview-card-copy b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font: 600 .72rem var(--font-ui); } .preview-card-copy small { color: var(--muted); font: 500 .61rem var(--font-ui); }
+.preview-card-ready { margin-left: auto; color: var(--accent); font-size: .85rem; }
+.preview-finish { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: rgba(157, 236, 206, .06); color: var(--ink-2); font: 600 .67rem var(--font-ui); }
+.preview-timeline { display: flex; align-items: center; gap: 18px; padding: 13px 12px 14px; color: var(--muted); font: 600 .64rem var(--font-ui); letter-spacing: .04em; text-transform: uppercase; }
+.preview-timeline span { display: inline-flex; align-items: center; gap: 5px; } .preview-timeline i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); } .preview-timeline .current { color: var(--ink); } .preview-timeline .current i { background: var(--accent); } .preview-timeline > div { flex: 1; height: 2px; border-radius: 99px; background: var(--line); }
+@keyframes scan-dot { 0%,70%,100% { opacity: .28; transform: scale(.85); } 35% { opacity: 1; transform: scale(1); } }
 
-  /* ── hero ── */
-  .hero { position: relative; isolation: isolate; overflow: hidden; }
-  .hero-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.6; }
-  .hero-fade { position: absolute; inset-inline: 0; bottom: 0; height: 128px; background: linear-gradient(to top, var(--background), transparent); pointer-events: none; }
-  .hero-in {
-    position: relative; z-index: 1; max-width: 896px; margin: 0 auto;
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    gap: 20px; padding: 104px 20px 56px;
-  }
-  .live-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
-  }
-  .live-badge .dot { width: 6px; height: 6px; background: var(--accent); animation: blink 1.6s steps(1) infinite; }
-  .hero h1 { font-size: clamp(30px, 4.6vw, 52px); line-height: 0.95; max-width: 16ch; }
-  .hero h1 .accent { color: var(--accent); }
-  .hero .sub { max-width: 62ch; font-size: 16px; line-height: 1.7; color: var(--muted); }
-  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; }
-  .hero-note { max-width: 60ch; font-size: 12px; line-height: 1.6; color: var(--muted); }
-  .hero-note a { color: var(--accent); text-underline-offset: 2px; }
-  .hero-note a:hover { color: var(--ink); }
+.section { padding-block: var(--section-y); border-top: 1px solid var(--line-2); }
+.section--alt { background: var(--bg-2); }
+.section-head { max-width: 650px; margin: 0 auto clamp(2rem, 4vw, 2.8rem); text-align: center; }
+.section-head .lead { margin: 18px auto 0; }
+.section-title { margin-top: 18px; }
+.intro-grid, .strategy-layout, .architecture, .insights-layout { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: start; }
+.intro-grid h2, .strategy-intro h2, .architecture h2, .insights-title h2 { margin-top: 18px; font: 600 clamp(2rem, 4.1vw, 3.15rem)/1.05 var(--font-display); letter-spacing: -.025em; }
+.intro-copy, .strategy-intro > p:not(.eyebrow), .architecture-copy { max-width: 52ch; color: var(--ink-2); font: 500 clamp(1.03rem, 1.35vw, 1.17rem)/1.58 var(--font-ui); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 34px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r); overflow: hidden; }
+.stat { padding: 18px 15px; background: var(--surface); } .stat strong { display: block; color: var(--ink); font: 600 clamp(1.65rem, 3vw, 2.35rem)/1 var(--font-display); } .stat span { display: block; margin-top: 7px; color: var(--muted); font: 500 .7rem var(--font-ui); letter-spacing: .06em; text-transform: uppercase; }
 
-  /* ── sections ── */
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 80px 20px; }
-  .kicker { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
-  .band-head { max-width: 640px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 48px; }
-  .band-head h2 { font-size: clamp(23px, 3.4vw, 38px); line-height: 1.02; }
-  .band-head p { font-size: 14px; line-height: 1.7; color: var(--muted); }
-  .band-head.center { text-align: center; align-items: center; margin-inline: auto; }
-  .band-head.center p { max-width: 62ch; }
+.strategy-list { display: grid; gap: 10px; }
+.strategy-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) 24px; align-items: start; gap: 16px; padding: 21px 22px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: transform .3s var(--ease), background .25s var(--ease), border-color .25s var(--ease), box-shadow .3s var(--ease); }
+.strategy-card:hover { transform: translateY(-2px); background: var(--bg-3); border-color: var(--line); box-shadow: var(--shadow); }
+.strategy-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 .8rem var(--font-ui); }
+.strategy-number { display: block; margin-top: 4px; color: var(--muted); font: 600 .72rem var(--font-ui); letter-spacing: .08em; }
+.strategy-card h3 { color: var(--ink); font: 600 1.12rem/1.15 var(--font-display); } .strategy-card p { margin-top: 7px; color: var(--muted); font: 500 .86rem/1.48 var(--font-ui); }
 
-  /* ── cards: framed, slabbed, square ── */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-  .card { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 12px; }
-  .card h3 { font-size: 17px; }
-  .card .price { font-family: "Syne", Arial, sans-serif; font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: -0.03em; }
-  .card .price small { font-size: 13px; color: var(--muted); font-family: "Space Grotesk", Arial, sans-serif; font-weight: 500; letter-spacing: 0; }
-  .card p { font-size: 13px; line-height: 1.65; color: var(--muted); }
-  .card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
-  .card .tag { align-self: flex-start; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 8px; }
+.live-section { background: var(--bg-2); }
+.live-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: center; }
+.live-layout h2 { margin-top: 18px; font: 600 clamp(2.2rem, 4.5vw, 3.55rem)/1.02 var(--font-display); } .live-layout .lead { margin-top: 18px; }
+.trybox { overflow: hidden; border: 1px solid var(--line); border-radius: clamp(18px, 2.6vw, 26px); background: var(--surface-2); box-shadow: var(--shadow-lg); }
+.trybox-top { display: flex; justify-content: space-between; align-items: center; padding: 17px 20px; border-bottom: 1px solid var(--line); background: var(--surface); } .trybox-top strong { color: var(--ink); font: 600 1rem var(--font-display); } .trybox-top span { color: var(--muted); font: 600 .66rem var(--font-ui); letter-spacing: .13em; text-transform: uppercase; }
+.tryrow { display: flex; gap: 10px; padding: 16px 20px 0; } .tryrow:last-of-type { padding-bottom: 16px; }
+.tryrow select { min-width: 0; flex: 1; padding: 12px 13px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg-2); color: var(--ink); font: 500 .84rem var(--font-ui); } .tryrow select:focus { border-color: var(--accent); }
+.tryrow .button { flex: 1; } .tryrow .button:disabled { opacity: .48; cursor: wait; transform: none; box-shadow: none; }
+#tryStatus { min-height: 22px; padding: 0 20px 8px; color: var(--muted); font: 600 .72rem var(--font-ui); } #tryStatus.err { color: #ffaaa0; }
+.result-output { min-height: 190px; margin: 0 20px 20px; padding: 18px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: #0a1a18; color: var(--ink-2); font: 500 .86rem/1.6 var(--font-ui); }
+.result-output h3 { margin: 0 0 10px; color: var(--ink); font: 600 1.05rem/1.2 var(--font-display); }
+.result-output h3:not(:first-child) { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.result-output p { margin: 0 0 12px; }
+.result-output p:last-child { margin-bottom: 0; }
+.result-output ul, .result-output ol { margin: 0 0 14px 20px; padding: 0; }
+.result-output li { margin: 5px 0; padding-left: 3px; }
+.result-output strong { color: var(--ink); font-weight: 700; }
+.result-output em { color: var(--ink); }
+.result-output code { padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: rgba(157, 236, 206, .08); }
+.result-output a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.answer-row { display: grid; grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr); gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.answer-row:last-child { border-bottom: 0; }
+.answer-label { color: var(--muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.answer-value { min-width: 0; color: var(--ink-2); }
+.answer-muted { color: var(--muted); }
+.answer-error { color: #ffaaa0; }
 
-  /* ── try widget ── */
-  .trybox { background: var(--surface); padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 900px; margin: 0 auto; }
-  .tryrow { display: flex; flex-wrap: wrap; gap: 12px; }
-  .tryrow input, .tryrow select {
-    font: inherit; font-size: 14px; color: var(--ink); background: var(--background);
-    border: 2px solid var(--line); padding: 12px 14px; min-width: 0;
-  }
-  .tryrow input { flex: 2 1 160px; text-transform: uppercase; }
-  .tryrow select { flex: 1 1 130px; }
-  .tryrow input::placeholder { color: var(--faint); }
-  #tryStatus { font-size: 12px; color: var(--muted); min-height: 18px; }
-  #tryStatus.err { color: #ff6b6b; }
-  #tryOut {
-    margin: 0; padding: 16px; overflow-x: auto; max-height: 420px; overflow-y: auto;
-    background: var(--background); border: 1px solid rgba(255,255,255,0.18);
-    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
-  }
+.architecture { align-items: center; }
+.architecture-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 28px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.architecture-card { min-height: 205px; padding: 24px 20px; background: var(--surface); transition: background .25s var(--ease); } .architecture-card:hover { background: var(--bg-3); }
+.card-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 .78rem var(--font-ui); }
+.card-index { display: block; margin-bottom: 12px; color: var(--muted); font: 600 .64rem var(--font-ui); letter-spacing: .12em; text-transform: uppercase; } .architecture-card h3 { font: 600 1.1rem/1.15 var(--font-display); } .architecture-card p { margin-top: 9px; color: var(--muted); font: 500 .82rem/1.48 var(--font-ui); }
 
-  /* ── setup tabs ── */
-  .tabs { display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: center; margin: 40px 0 20px; }
-  .tab {
-    padding: 10px 2px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-    background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
-    box-shadow: none;
-    transition: color 160ms ease, border-color 160ms ease;
-  }
-  .tab:hover { color: var(--ink); }
-  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-  .tab:focus { outline: none; }
-  .tab:focus-visible { outline: none; color: var(--ink); border-bottom-color: var(--accent); }
-  .panel { padding: 8px 0 24px; max-width: 900px; margin: 0 auto; }
-  .panel[hidden] { display: none; }
-  .panel h3 { font-size: 17px; margin-bottom: 8px; }
-  .panel .note { font-size: 14px; line-height: 1.65; color: var(--muted); margin-bottom: 20px; max-width: 68ch; }
-  .step-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; }
-  .step-label:first-of-type { margin-top: 0; }
-  .bridge { max-width: 900px; margin: 24px auto 0; font-size: 14px; line-height: 1.7; color: var(--muted); text-align: center; }
+.pricing-head { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: end; margin-bottom: 30px; } .pricing-head h2 { font: 600 clamp(2.25rem, 4.8vw, 3.8rem)/1 var(--font-display); } .pricing-head p { max-width: 50ch; color: var(--ink-2); font: 500 1rem/1.55 var(--font-ui); }
+.price-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.price-card { min-height: 172px; padding: 21px 17px; background: var(--surface); } .price-card:hover { background: var(--bg-3); } .price-card h3 { font: 600 1rem/1.12 var(--font-display); } .price { margin-top: 24px; color: var(--ink); font: 600 1.6rem/1 var(--font-display); } .price small { color: var(--muted); font: 500 .68rem var(--font-ui); } .price-card p { margin-top: 9px; color: var(--muted); font: 500 .76rem/1.4 var(--font-ui); }
+.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 28px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.trust-card { min-height: 175px; padding: 22px 18px; background: var(--bg-2); } .trust-card:hover { background: var(--surface); } .trust-card .card-icon { margin-bottom: 18px; background: transparent; border: 1px solid var(--line); color: var(--ink); } .trust-card h3 { font: 600 1rem/1.16 var(--font-display); } .trust-card p { margin-top: 9px; color: var(--muted); font: 500 .78rem/1.45 var(--font-ui); } code { color: var(--ink); font: 600 .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* ── code blocks ── */
-  .code { position: relative; }
-  pre.codeblock {
-    margin: 0; padding: 16px 84px 16px 16px; overflow-x: auto;
-    background: var(--surface); border: 1px solid rgba(255,255,255,0.18);
-    font-size: 13px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
-  }
-  .copy {
-    position: absolute; top: 12px; right: 12px; padding: 7px 12px;
-    font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
-    background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.25);
-    transition: transform 120ms ease, color 160ms ease, background-color 160ms ease;
-  }
-  .copy:hover { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-  .stack { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto; }
+.insights { background: var(--bg-2); } .insights-title .button { margin-top: 25px; } .article-list { display: grid; gap: 10px; } .article { display: grid; grid-template-columns: 42px minmax(0, 1fr) 24px; gap: 16px; align-items: start; padding: 20px 21px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: transform .3s var(--ease), background .25s var(--ease), box-shadow .3s var(--ease); } .article:hover { transform: translateY(-2px); background: var(--bg-3); box-shadow: var(--shadow); } .article-index { color: var(--muted); font: 600 .75rem var(--font-ui); letter-spacing: .08em; } .article h3 { font: 600 1.08rem/1.15 var(--font-display); } .article p { margin-top: 7px; color: var(--muted); font: 500 .82rem/1.45 var(--font-ui); } .article .arrow { color: var(--muted); transition: transform .25s var(--ease), color .25s var(--ease); } .article:hover .arrow { color: var(--ink); transform: translateX(3px); }
 
-  footer { border-top: 2px solid var(--line); }
-  .foot {
-    max-width: 1120px; margin: 0 auto; padding: 24px 20px;
-    display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
-    font-size: 12px; color: var(--muted);
-  }
-  .foot a { color: var(--accent); text-underline-offset: 2px; }
-  .foot a:hover { color: var(--ink); }
-  .disclaimer { max-width: 1120px; margin: 0 auto; padding: 0 20px 24px; font-size: 11px; line-height: 1.6; color: var(--faint); }
+.cta { padding-block: clamp(3.4rem, 6vw, 6rem); } .cta-inner { position: relative; overflow: hidden; padding: clamp(2.4rem, 4.6vw, 4rem); border: 1px solid var(--line); border-radius: clamp(18px, 2.6vw, 26px); background: var(--bg-2); text-align: center; } .cta-inner::after { content: ''; position: absolute; width: 220px; height: 220px; right: -80px; bottom: -120px; border-radius: 50%; background: rgba(157, 236, 206, .10); filter: blur(12px); } .cta-inner h2 { font: 600 clamp(2.2rem, 4.6vw, 3.5rem)/1 var(--font-display); } .cta-inner p { max-width: 48ch; margin: 14px auto 0; color: var(--ink-2); font: 500 clamp(1rem, 1.3vw, 1.16rem)/1.46 var(--font-ui); } .cta-inner .button { margin-top: 23px; position: relative; z-index: 1; background: var(--ink); color: var(--on-accent); }
 
-  @media (max-width: 640px) {
-    .hero-in { padding: 76px 20px 44px; }
-    .wrap { padding: 56px 20px; }
-    .hero-cta .btn { width: 100%; }
-    input, select, textarea { font-size: 16px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
-    #splash { display: none; }
-  }
+.site-footer { border-top: 1px solid var(--line); padding-top: 1.8rem; } .footer-layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(2rem, 6vw, 6rem); padding-bottom: 3.2rem; } .footer-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; } .footer-group { display: flex; flex-direction: column; gap: 10px; } .footer-group h3 { margin-bottom: 7px; color: var(--muted); font: 600 .68rem var(--font-ui); letter-spacing: .14em; text-transform: uppercase; } .footer-group a { color: var(--ink-2); font: 500 .83rem var(--font-ui); transition: color .2s var(--ease); } .footer-group a:hover { color: var(--ink); } .newsletter h2 { font: 600 clamp(1.7rem, 3vw, 2.35rem)/1.05 var(--font-display); } .newsletter p { max-width: 35ch; margin-top: 9px; color: var(--muted); font: 500 .86rem/1.5 var(--font-ui); } .subscribe { display: flex; gap: 8px; margin-top: 20px; } .subscribe input { min-width: 0; flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); } .subscribe input::placeholder { color: var(--muted); } .subscribe .button { padding-inline: 17px; } .footer-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-block: 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font: 500 .78rem var(--font-ui); } .footer-bottom .wordmark { font-size: 1.2rem; } .disclaimer { padding-bottom: 1.6rem; color: var(--faint); font: 500 .7rem/1.5 var(--font-ui); }
+
+@media (max-width: 1000px) { .intro-grid, .strategy-layout, .architecture, .live-layout, .pricing-head, .insights-layout { grid-template-columns: 1fr; gap: 2.3rem; } .strategy-intro, .architecture > div:first-child, .insights-title { max-width: 650px; } .price-grid { grid-template-columns: repeat(3, 1fr); } .trust-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { :root { --gutter: 20px; } .header-inner { height: 72px; } .header-action { padding-inline: 16px; font-size: .82rem; } .menu-grid { grid-template-columns: 1fr; } .hero { padding-top: 1.3rem; } .tryrow, .subscribe { flex-direction: column; } .tryrow .button, .subscribe .button { width: 100%; } .preview-body { grid-template-columns: 1fr; } .preview-side { display: none; } .preview-main { padding: 19px 15px 16px; } .preview-timeline { gap: 9px; font-size: .54rem; } .stats { grid-template-columns: 1fr; } .architecture-cards, .price-grid { grid-template-columns: 1fr; } .price-card { min-height: 0; } .trust-grid { grid-template-columns: 1fr; } .footer-layout { grid-template-columns: 1fr; gap: 2.6rem; } .footer-groups { gap: 18px; } .article { grid-template-columns: 30px minmax(0, 1fr) 20px; gap: 10px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; } }
 </style>
 </head>
 <body>
 
-<div id="splash" aria-hidden="true">
-  <div class="row">
-    <svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>
-    <span class="word">UZAM<span class="caret"></span></span>
-  </div>
-</div>
 
-<header class="bar">
-  <div class="bar-in">
-    <a class="wordmark" href="#top" aria-label="Uzam home">
-      <svg class="hex" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L86 29 L86 71 L50 92 L14 71 L14 29 Z" fill="none" stroke="#52FF00" stroke-width="10"/><circle cx="50" cy="50" r="12" fill="#52FF00"/></svg>UZAM
-    </a>
-    <nav class="links" aria-label="Main navigation">
-      <a href="#try">Try live</a>
-      <a href="#pricing" class="hide-sm">Pricing</a>
-      <a href="https://www.okx.ai/agents/13653">OKX.AI</a>
-    </nav>
-    <div class="bar-cta">
-      <a class="bar-link" href="/health">Live health</a>
-    </div>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="wordmark" href="#top" aria-label="Uzam home"><span>UZAM</span></a>
+    <a class="header-action" href="#try">Try for free</a>
   </div>
 </header>
 
 <main id="top">
-  <!-- ── HERO ── -->
   <section class="hero">
-    <div class="hero-grid grid-fade" aria-hidden="true"></div>
-    <div class="hero-fade" aria-hidden="true"></div>
-    <div class="hero-in">
-      <p class="live-badge"><span class="dot" aria-hidden="true"></span>Live on X Layer · Chain 196 · ASP #13653 on OKX.AI</p>
-      <h1>Tokenized-stock research your agent can <span class="accent">cite.</span></h1>
-      <p class="sub">
-        Uzam digs through issuer docs, SEC filings, and X Layer onchain data so your agent
-        doesn't have to. Quoted backing evidence, price-vs-reference premium, holders and
-        liquidity, 9-category risks — and it states what it cannot prove instead of guessing.
-      </p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="#try">
-          Try it live — free
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
-        </a>
-        <a class="btn" href="https://www.okx.ai/agents/13653">Hire on OKX.AI</a>
+    <div class="container hero-inner">
+      <div class="hero-copy-wrap">
+        <p class="eyebrow eyebrow--center">Live on OKXAI</p>
+        <h1 class="display hero-title">RWA Intelligence research agent</h1>
+        <p class="lead hero-sub">Uzam is an RWA intelligence MCP that gives AI agents the ability to investigate tokenized assets using onchain data, official documents, issuer information and evidence-backed research.</p>
+        <div class="hero-actions"><a class="button" href="#try">Try for free <span class="arrow" aria-hidden="true">↗</span></a><a class="button secondary" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a></div>
       </div>
+
     </div>
   </section>
 
-  <!-- ── TRY LIVE ── -->
-  <section class="band" id="try">
-    <div class="wrap">
-      <div class="band-head center">
-        <p class="kicker">Try live · free via MCP</p>
-        <h2>Ask about any of the 16 xStocks.</h2>
-        <p>This calls the same free MCP endpoint any agent can hit — live data, no signup, no wallet. Paid REST tiers below.</p>
-      </div>
-      <div class="trybox frame slab">
-        <div class="tryrow">
-          <select id="sym" aria-label="Token symbol">
-            <option value="AAPLx">AAPLx — Apple</option>
-            <option value="TSLAx">TSLAx — Tesla</option>
-            <option value="NVDAx" selected>NVDAx — NVIDIA</option>
-            <option value="SPYx">SPYx — S&amp;P 500</option>
-            <option value="GOOGLx">GOOGLx — Alphabet</option>
-            <option value="MSFTx">MSFTx — Microsoft</option>
-            <option value="AMZNx">AMZNx — Amazon</option>
-            <option value="METAx">METAx — Meta</option>
-            <option value="NFLXx">NFLXx — Netflix</option>
-            <option value="AMDx">AMDx — AMD</option>
-            <option value="COINx">COINx — Coinbase</option>
-            <option value="HOODx">HOODx — Robinhood</option>
-            <option value="AVGOx">AVGOx — Broadcom</option>
-            <option value="JPMx">JPMx — JPMorgan</option>
-            <option value="Vx">Vx — Visa</option>
-            <option value="PLTRx">PLTRx — Palantir</option>
-          </select>
-          <select id="lang" aria-label="Response language">
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-          </select>
-        </div>
-        <div class="tryrow">
-          <button class="btn btn-sm" id="btnId" type="button">Identify — instant</button>
-          <button class="btn btn-sm btn-primary" id="btnGo" type="button">Full report — ~20s</button>
-        </div>
-        <p id="tryStatus" role="status"></p>
-        <pre id="tryOut">Your answer appears here.</pre>
-      </div>
-    </div>
-  </section>
+  <section class="section" id="about"><div class="container"><div class="intro-grid"><div><p class="eyebrow">Research infrastructure</p><h2>See what the price leaves out.</h2></div><div><p class="intro-copy">A price is only the starting point. Uzam brings together issuer claims, official documents, market data, and onchain behavior so your agent can cite the full picture.</p><div class="stats"><div class="stat"><strong>16</strong><span>assets covered</span></div><div class="stat"><strong>9</strong><span>risk checks</span></div><div class="stat"><strong>196</strong><span>X Layer chain</span></div></div></div></div></div></section>
 
-  <!-- ── PRICING ── -->
-  <section class="band" id="pricing">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">Pricing · pay per call</p>
-        <h2>Free to meet. Paid to dig.</h2>
-        <p>Discovery and agent access stay open. Depth is settled per call in USDT0 on X Layer via x402 — no signup, no API key, the HTTP 402 is the invoice.</p>
-      </div>
-      <div class="cards">
-        <div class="card frame slab">
-          <span class="tag">Agents</span>
-          <h3>MCP access</h3>
-          <p class="price">$0.00<small> / always</small></p>
-          <p>All 5 tools in Claude, Cursor, OpenCode. The demo window — point your agent at one URL and ask.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Identify</h3>
-          <p class="price">$0.15<small> / call</small></p>
-          <p>Issuer, underlying, chain, official docs. Never guesses — unknown symbols return the supported list.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Preview</h3>
-          <p class="price">$0.15<small> / call</small></p>
-          <p>Capped identity-only report. Zero external fetches — the cheapest way to check coverage.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Full report</h3>
-          <p class="price">$0.25<small> / call</small></p>
-          <ul>
-            <li>Backing quotes + premium math</li>
-            <li>Holders, pools, 30-day range</li>
-            <li>9 risks, SEC filings, unknowns</li>
-          </ul>
-        </div>
-        <div class="card frame slab">
-          <h3>Compare ×4</h3>
-          <p class="price">$0.50<small> / call</small></p>
-          <p>Up to 4 assets side by side with per-category leaders, premium deltas and shared-whale flags.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+  <section class="section section--alt" id="strategies"><div class="container strategy-layout"><div class="strategy-intro"><p class="eyebrow">How it works</p><h2>From symbol to sourced report.</h2><p>Start with a symbol. End with evidence you can review and use.</p></div><div class="strategy-list">
+    <article class="strategy-card"><span class="strategy-icon">⌁</span><div><span class="strategy-number">01</span><h3>Identify the asset</h3><p>Resolve the issuer, underlying asset, chain, official pages, and contract without guessing.</p></div></article>
+    <article class="strategy-card"><span class="strategy-icon">▱</span><div><span class="strategy-number">02</span><h3>Check the evidence</h3><p>Separate issuer claims from facts observed across documents, filings, and market data.</p></div></article>
+    <article class="strategy-card"><span class="strategy-icon">◌</span><div><span class="strategy-number">03</span><h3>Read the market</h3><p>See price premium, holders, concentration, liquidity, pools, and recent range.</p></div></article>
+    <article class="strategy-card"><span class="strategy-icon">△</span><div><span class="strategy-number">04</span><h3>Show the risks</h3><p>Nine fixed risk checks ranked high to low, with the missing evidence and the event that could change the conclusion.</p></div></article>
+    <article class="strategy-card"><span class="strategy-icon">↗</span><div><span class="strategy-number">05</span><h3>Built for agents</h3><p>Use MCP, REST, or x402 with structured output made for agent workflows.</p></div></article>
+  </div></div></section>
 
-  <!-- ── API ── -->
-  <section class="band" id="api">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">API · REST + x402</p>
-        <h2>Built for agents first.</h2>
-        <p>Free discovery, paid depth. Unpaid calls to paid routes return <code>402 Payment Required</code> — the invoice is in the header. Machine-readable contract at <code>/.well-known/x402</code>.</p>
-      </div>
-      <div class="stack">
-        <div>
-          <p class="step-label">Free discovery — identify (MCP, no payment)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
-       "params":{"name":"identify_asset",
-       "arguments":{"symbol":"AAPLx","lang":"en"}}}'</pre><button class="copy" type="button">Copy</button></div>
-        </div>
-        <div>
-          <p class="step-label">Paid depth — full report ($0.25 via x402)</p>
-          <div class="code"><pre class="codeblock">curl -X POST https://uzam-m3pi.onrender.com/api/research \
-  -H "Content-Type: application/json" \
-  -d '{"symbol":"NVDAx","focus":"full","lang":"zh"}'
-# → 402 + PAYMENT-REQUIRED on first call; pay 0.25 USDT0 on X Layer, replay with the signature, get the dossier.</pre><button class="copy" type="button">Copy</button></div>
-        </div>
-        <div>
-          <p class="step-label">Agent install snippet</p>
-          <div class="code"><pre class="codeblock">{
-  "mcpServers": {
-    "uzam": { "url": "https://uzam-m3pi.onrender.com/mcp" }
-  }
-}
-# Then ask: "Use Uzam to compare AAPLx vs TSLAx backing and biggest unanswered risks."</pre><button class="copy" type="button">Copy</button></div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <section class="section live-section" id="try"><div class="container live-layout"><div><p class="eyebrow">Try real research · free via MCP</p><h2>Get a clearer answer.</h2><p class="lead">Choose an asset and language, then run an instant identity check or a full evidence-backed report.</p></div><div class="trybox"><div class="trybox-top"><strong>Live research console</strong><span>MCP endpoint</span></div><div class="tryrow"><select id="sym" aria-label="Token symbol"><option value="AAPLx">AAPLx — Apple</option><option value="TSLAx">TSLAx — Tesla</option><option value="NVDAx" selected>NVDAx — NVIDIA</option><option value="SPYx">SPYx — S&amp;P 500</option><option value="GOOGLx">GOOGLx — Alphabet</option><option value="MSFTx">MSFTx — Microsoft</option><option value="AMZNx">AMZNx — Amazon</option><option value="METAx">METAx — Meta</option><option value="NFLXx">NFLXx — Netflix</option><option value="AMDx">AMDx — AMD</option><option value="COINx">COINx — Coinbase</option><option value="HOODx">HOODx — Robinhood</option><option value="AVGOx">AVGOx — Broadcom</option><option value="JPMx">JPMx — JPMorgan</option><option value="Vx">Vx — Visa</option><option value="PLTRx">PLTRx — Palantir</option></select><select id="lang" aria-label="Response language"><option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option></select></div><div class="tryrow"><button class="button secondary" id="btnId" type="button">Identify — instant</button><button class="button" id="btnGo" type="button">Full report — ~20s</button></div><p id="tryStatus" role="status"></p><div id="tryOut" class="result-output" aria-live="polite"><p class="answer-muted">Your answer will appear here.</p></div></div></div></section>
 
-  <!-- ── GUARDRAILS ── -->
-  <section class="band" id="trust">
-    <div class="wrap">
-      <div class="band-head">
-        <p class="kicker">Trust · guardrails, not vibes</p>
-        <h2>What Uzam refuses to do.</h2>
-        <p>The rules are in code, not in prompts — so they hold no matter which agent calls.</p>
-      </div>
-      <div class="cards">
-        <div class="card frame slab">
-          <h3>Never invents</h3>
-          <p>Unknown symbols return the supported list. Missing data returns <code>missing[]</code>, never a plausible fake. No contract is ever hardcoded.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Claim vs fact</h3>
-          <p>Issuer statements are labeled CLAIM until independently verified. Grades cap at MEDIUM on issuer word alone — HIGH needs multiple sources plus tokenlist confirmation.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Unknowns stated</h3>
-          <p>Every report ends with what couldn't be proven and what would change the conclusion. "Custodian UNKNOWN" beats a confident lie.</p>
-        </div>
-        <div class="card frame slab">
-          <h3>Never "safe"</h3>
-          <p>Nine fixed risk categories, ranked high → low. The word "safe" appears nowhere in the codebase — only observed severity.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+  <section class="section" id="api"><div class="container architecture"><div><p class="eyebrow">Research that fits your stack</p><h2>Built for agents.</h2></div><div><p class="architecture-copy">Connect once, get structured research, and keep the boundary around what is known visible. <code>402 Payment Required</code> handles paid depth without a billing dashboard.</p><div class="architecture-cards"><article class="architecture-card"><span class="card-icon">⌁</span><span class="card-index">01 / FREE TO START</span><h3>MCP access</h3><p>Connect an agent to one URL and ask about any supported token.</p></article><article class="architecture-card"><span class="card-icon">$</span><span class="card-index">02 / PAY FOR DEPTH</span><h3>Paid research depth</h3><p>Pay for deeper research in USDT0 on X Layer, without signup or a billing dashboard.</p></article><article class="architecture-card"><span class="card-icon">✓</span><span class="card-index">03 / READY TO CITE</span><h3>Citable output</h3><p>Every report includes sources, timestamps, confidence, missing data, and clear limits.</p></article></div></div></div></section>
 
+  <section class="section section--alt" id="pricing"><div class="container"><div class="pricing-head"><h2>Free to start.<br />Pay to go deeper.</h2><p>Discovery is open. Deeper reports are paid per call in USDT0 on X Layer through x402.</p></div><div class="price-grid"><article class="price-card"><h3>MCP access</h3><div class="price">$0.00 <small>/ always</small></div><p>Five research tools for agents.</p></article><article class="price-card"><h3>Identify</h3><div class="price">$0.15 <small>/ call</small></div><p>Issuer, underlying asset, chain, and sources.</p></article><article class="price-card"><h3>Preview</h3><div class="price">$0.15 <small>/ call</small></div><p>Check whether an asset is covered.</p></article><article class="price-card"><h3>Full report</h3><div class="price">$0.25 <small>/ call</small></div><p>Backing, market data, risks, and filings.</p></article><article class="price-card"><h3>Compare ×4</h3><div class="price">$0.50 <small>/ call</small></div><p>Compare up to four assets.</p></article></div><div class="trust-grid" id="trust"><article class="trust-card"><span class="card-icon">×</span><h3>No invented answers</h3><p>Unknown symbols return the supported list. Missing data stays visible.</p></article><article class="trust-card"><span class="card-icon">≠</span><h3>Claims vs facts</h3><p>Issuer statements stay labeled as claims until independent evidence supports them.</p></article><article class="trust-card"><span class="card-icon">?</span><h3>Unknowns stay visible</h3><p>Every report says what could not be proven and what would change the conclusion.</p></article><article class="trust-card"><span class="card-icon">!</span><h3>Never calls assets safe</h3><p>Nine fixed risk checks, ranked high to low. Only observed severity, never a promise.</p></article></div></div></section>
+
+  <section class="cta" id="start"><div class="container"><div class="cta-inner"><h2>Get a clearer answer.</h2><p>Pick an asset, review the evidence, and give your agent a report it can cite.</p><a class="button" href="#try">Open research console <span class="arrow">↗</span></a></div></div></section>
 </main>
 
-<footer>
-  <div class="foot">
-    <span><a href="https://www.okx.ai/agents/13653">ASP #13653 on OKX.AI</a> · <a href="https://github.com/zachbuilds26/uzam">source</a> · <a href="/health">health</a> · <a href="/openapi.json">openapi</a></span>
-    <span>Settled on X Layer (196) · USDT0 via x402</span>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span class="wordmark" aria-label="Uzam">Uzam</span>
+      <span>Live on OKXAI</span>
+    </div>
   </div>
-  <p class="disclaimer">Research only, not financial advice. Tokenized equities carry issuer, custody, redemption and regulatory risk, including total loss. Uzam provides evidenced analysis of listed instruments; it does not execute trades or custody funds.</p>
 </footer>
-
 <script>
-/* Splash, setup tabs, copy buttons, and the live try-widget. */
-(function () {
-  var splash = document.getElementById('splash');
-  if (!splash) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    splash.remove();
-    return;
-  }
-  requestAnimationFrame(function () { splash.classList.add('typing'); });
-  setTimeout(function () { splash.classList.add('done'); }, 1400);
-  setTimeout(function () { splash.remove(); }, 1800);
-})();
-
-document.addEventListener('click', function (ev) {
-  var btn = ev.target.closest ? ev.target.closest('.copy') : null;
-  if (!btn) return;
-  var pre = btn.parentElement.querySelector('pre');
-  if (!pre) return;
-  var done = function (label) {
-    btn.textContent = label;
-    setTimeout(function () { btn.textContent = 'Copy'; }, 2200);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(pre.textContent).then(function () { done('Copied'); }, function () { done('Press Ctrl+C'); });
-  } else {
-    var r = document.createRange();
-    r.selectNodeContents(pre);
-    var sel = getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
-    done('Press Ctrl+C');
-  }
-});
-
-/* ── Try widget: free MCP calls from the browser ── */
 (function () {
   var sym = document.getElementById('sym');
   var lang = document.getElementById('lang');
@@ -488,10 +290,83 @@ document.addEventListener('click', function (ev) {
   var btnGo = document.getElementById('btnGo');
   if (!sym || !out) return;
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (char) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+    });
+  }
+
+  function inlineMarkdown(value) {
+    var safe = escapeHtml(value);
+    safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    safe = safe.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>');
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    safe = safe.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return safe;
+  }
+
+  function labelize(value) {
+    return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function renderAnswer(value) {
+    var text = String(value || '').replace(/\r/g, '').trim();
+    if (!text) return '<p class="answer-muted">No answer was returned.</p>';
+    var lines = text.split('\n');
+    var html = [];
+    var paragraph = [];
+    var listTag = null;
+    function flushParagraph() {
+      if (paragraph.length) {
+        html.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
+        paragraph = [];
+      }
+    }
+    function closeList() {
+      if (listTag) { html.push('</' + listTag + '>'); listTag = null; }
+    }
+    lines.forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) { flushParagraph(); closeList(); return; }
+      var heading = line.match(/^#{1,6}\s+(.+)$/);
+      var bullet = line.match(/^[-*•]\s+(.+)$/);
+      var numbered = line.match(/^\d+[.)]\s+(.+)$/);
+      var pair = line.match(/^([^:]{2,48}):\s+(.+)$/);
+      if (heading) {
+        flushParagraph(); closeList(); html.push('<h3>' + inlineMarkdown(heading[1]) + '</h3>');
+      } else if (bullet || numbered) {
+        flushParagraph();
+        var tag = numbered ? 'ol' : 'ul';
+        if (listTag !== tag) { closeList(); html.push('<' + tag + '>'); listTag = tag; }
+        html.push('<li>' + inlineMarkdown((bullet || numbered)[1]) + '</li>');
+      } else if (pair && !/^https?:\/\//i.test(pair[2])) {
+        flushParagraph(); closeList();
+        html.push('<div class="answer-row"><span class="answer-label">' + inlineMarkdown(pair[1]) + '</span><span class="answer-value">' + inlineMarkdown(pair[2]) + '</span></div>');
+      } else {
+        closeList(); paragraph.push(line);
+      }
+    });
+    flushParagraph(); closeList();
+    return html.join('');
+  }
+
+  function renderResponse(data) {
+    if (data && typeof data.summary === 'string' && data.summary.trim()) return renderAnswer(data.summary);
+    if (typeof data === 'string') return renderAnswer(data);
+    if (data && typeof data === 'object') {
+      var lines = Object.keys(data).map(function (key) {
+        var value = data[key];
+        return labelize(key) + ': ' + (typeof value === 'object' ? JSON.stringify(value) : String(value));
+      });
+      return renderAnswer(lines.join('\n'));
+    }
+    return renderAnswer(data);
+  }
+
   function setBusy(busy, label) {
     btnId.disabled = busy;
     btnGo.disabled = busy;
-    status.className = busy ? '' : status.className;
     if (busy) status.textContent = label;
   }
 
@@ -504,8 +379,8 @@ document.addEventListener('click', function (ev) {
       if (!res.ok) throw new Error('HTTP ' + res.status + ' — host may be waking, retry shortly.');
       return res.text();
     }).then(function (text) {
-      var lines = text.split('\n').filter(function (l) { return l.indexOf('data: ') === 0; });
-      if (lines.length === 0) throw new Error('No MCP data in response (host may be waking — try again).');
+      var lines = text.split('\n').filter(function (line) { return line.indexOf('data: ') === 0; });
+      if (!lines.length) throw new Error('No MCP data in response — try again.');
       var msg = JSON.parse(lines[lines.length - 1].slice(6));
       if (msg.error) throw new Error(msg.error.message || 'MCP error');
       var content = (msg.result && msg.result.content && msg.result.content[0]) || {};
@@ -514,67 +389,45 @@ document.addEventListener('click', function (ev) {
     });
   }
 
-  function cleanSymbol() {
-    return sym.value;
-  }
-
-  // Machine reason codes → human words. The JSON keeps the codes; humans read this.
-  function liveHuman(reason) {
-    var r = String(reason || '');
-    if (/contract_on_xlayer|token_search|timeout_12s|network error|fetch failed/i.test(r)) return 'market unreachable right now — retry shortly';
-    if (/okx_credentials/i.test(r)) return 'market data not configured';
-    return r || 'unknown';
-  }
-
-  function renderIdentify(d) {
-    if (!d.found) return 'Not in registry. Supported: ' + (d.supported_symbols || []).join(', ') + '\n' + (d.uncertainty || '');
-    var L = [];
-    L.push(d.symbol + ' — ' + d.name);
-    L.push('Issuer: ' + d.issuer + (d.issuer_legal ? ' (' + d.issuer_legal + ')' : ''));
-    L.push('Underlying: ' + (d.underlying_asset || ''));
-    if (d.underlying && d.underlying.ticker) L.push('  Ticker ' + d.underlying.ticker + ' · ' + (d.underlying.exchange || '') + (d.underlying.sec_filings ? ' · Filings: ' + d.underlying.sec_filings : ''));
-    L.push('Chain: ' + (d.chains || []).join(', ') + ' (' + (d.chainIds || []).join(', ') + ')' + (d.chain_info && d.chain_info.explorer ? ' — ' + d.chain_info.explorer : ''));
-    if (d.live && d.live.available) L.push('Live: $' + d.live.price + ' (' + (d.live.data_timestamp || '').slice(0, 16).replace('T', ' ') + ' UTC)');
-    else if (d.live) L.push('Live price unavailable — ' + liveHuman(d.live.reason));
-    if (d.product_page) L.push('Product page: ' + d.product_page);
-    if (d.issuer_published_contract) L.push('Issuer-published contract: ' + d.issuer_published_contract + (d.issuer_contract_explorer ? ' — ' + d.issuer_contract_explorer : ''));
-    L.push('Official docs:');
-    (d.official_documents || []).forEach(function (u) { L.push('  - ' + u); });
-    return L.join('\n');
+  function identifyText(data) {
+    if (!data.found) return 'Not in registry:\nSupported symbols: ' + (data.supported_symbols || []).join(', ') + '\n' + (data.uncertainty || '');
+    var lines = [];
+    lines.push(data.symbol + ' — ' + data.name);
+    lines.push('Issuer: ' + data.issuer + (data.issuer_legal ? ' (' + data.issuer_legal + ')' : ''));
+    lines.push('Underlying: ' + (data.underlying_asset || ''));
+    if (data.underlying && data.underlying.ticker) lines.push('Ticker: ' + data.underlying.ticker + ' · ' + (data.underlying.exchange || ''));
+    lines.push('Chain: ' + (data.chains || []).join(', ') + ' (' + (data.chainIds || []).join(', ') + ')');
+    if (data.live && data.live.available) lines.push('Live price: $' + data.live.price);
+    else if (data.live) lines.push('Live price: ' + (data.live.reason || 'unavailable'));
+    lines.push('Official documents:');
+    (data.official_documents || []).forEach(function (url) { lines.push('- ' + url); });
+    return lines.join('\n');
   }
 
   btnId.addEventListener('click', function () {
-    var s;
-    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
-    setBusy(true, 'Asking Uzam…');
-    out.textContent = '…';
-    mcpCall('identify_asset', { symbol: s, lang: lang.value }).then(function (d) {
-      out.textContent = renderIdentify(d);
-      status.textContent = 'Free via MCP · ' + new Date().toISOString();
-      status.className = '';
-    }).catch(function (e) {
-      out.textContent = 'Failed: ' + e.message;
-      status.textContent = 'Error — retry, or check /health.';
-      status.className = 'err';
+    setBusy(true, 'Checking the asset…');
+    out.innerHTML = '<p class="answer-muted">Working on it…</p>';
+    mcpCall('identify_asset', { symbol: sym.value, lang: lang.value }).then(function (data) {
+      out.innerHTML = renderAnswer(identifyText(data));
+      status.textContent = 'Free via MCP · live response.';
+    }).catch(function (error) {
+      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the answer: ' + error.message) + '</p>';
+      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
     }).then(function () { setBusy(false); });
   });
 
   btnGo.addEventListener('click', function () {
-    var s;
-    try { s = cleanSymbol(); } catch (e) { status.textContent = e.message; status.className = 'err'; return; }
-    setBusy(true, 'Full research runs ~20s (OKX + issuer pages + SEC + news)…');
-    out.textContent = 'Gathering evidence…';
-    mcpCall('research_asset', { symbol: s, focus: 'full', lang: lang.value }).then(function (d) {
-      out.textContent = d.summary || JSON.stringify(d, null, 2).slice(0, 6000);
-      status.textContent = 'Free via MCP · full dossier above.';
-      status.className = '';
-    }).catch(function (e) {
-      out.textContent = 'Failed: ' + e.message;
-      status.textContent = 'Error — retry, or check /health.';
-      status.className = 'err';
+    setBusy(true, 'Research takes about 20 seconds…');
+    out.innerHTML = '<p class="answer-muted">Gathering evidence from documents and onchain data…</p>';
+    mcpCall('research_asset', { symbol: sym.value, focus: 'full', lang: lang.value }).then(function (data) {
+      out.innerHTML = renderResponse(data);
+      status.textContent = 'Free via MCP · full report above.';
+    }).catch(function (error) {
+      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the report: ' + error.message) + '</p>';
+      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
     }).then(function () { setBusy(false); });
   });
-})();
+}());
 </script>
 </body>
 </html>
