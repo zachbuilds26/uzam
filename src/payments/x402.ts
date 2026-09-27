@@ -101,7 +101,7 @@ export async function mountPaidRoutes(app: Express): Promise<{ paid: boolean; re
 // that charge first and validate later.)
 // Paths are normalized (trailing slash) because the paywall normalizes too —
 // validation and charging must agree on what a route is.
-const TICKER = /^(?=.*[A-Za-z0-9])[A-Za-z0-9.\-]{1,20}$/;
+const TICKER = /^[A-Za-z0-9](?:[A-Za-z0-9.\-]{0,18}[A-Za-z0-9])?$/;
 const FOCUS = ["full", "issuer", "backing", "risks"] as const;
 const LANG_RE = /^[a-z]{2}(-[a-z]{2})?$/;
 
