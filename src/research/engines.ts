@@ -1614,6 +1614,12 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       unknowns_mandatory: unknownsI,
       source_register: registerI,
       research_plan: plan,
+      summary: `## ${asset.symbol} — issuer & identity\n` +
+        `- ${asset.underlying_asset} · issued as ${asset.issuer}${asset.issuer_legal ? ` (${asset.issuer_legal})` : ""}\n` +
+        `- Backing claim: ${cutWords(String(backingI.issuer_claim ?? "none extracted"), 180)}\n` +
+        `- Custodian: ${cutWords(String(backingI.custodian ?? "UNKNOWN"), 140)}\n` +
+        (plan ? `- Plan: ${plan.note} Skipped: ${plan.skipped.length > 0 ? plan.skipped.map((s) => String(s.evidence)).join(", ") : "nothing"}.\n` : "") +
+        `- Open questions: ${unknownsI.length} (see unknowns). Market/onchain data: out of scope here — see full research.`,
       note: "Issuer focus: identity + legal/document research only. No onchain, market, filings or news fetches performed.",
       confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: backingI.confidence ?? "UNKNOWN" },
       receipt: `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · issuer focus, ${Array.isArray(backingI.pages_read) ? backingI.pages_read.length : 0} ${L("rpt_pages")} ${L("rpt_in")} ${secs}s · data ${now()}`,
