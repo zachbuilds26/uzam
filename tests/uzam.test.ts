@@ -233,19 +233,32 @@ describe("identify: verification checks, unknowns, no market data", () => {
     }
     assert.ok(id.verification_checks.every((c) => c.verified), "registry AAPLx verifies all 5");
   });
-  it("never guesses standard/decimals/rights; decimals resolve or stay unknown consistently", async () => {
+  it("resolves standard/decimals from live sources or stays consistently unknown — never guessed", async () => {
     const id = await buildIdentity("AAPLx", { lang: "en" });
-    assert.equal(id.identity.token_standard, null);
-    assert.ok(id.unknown.some((u) => /standard/i.test(u)));
-    assert.equal(id.legal_structure.direct_shareholder_rights, null);
-    assert.ok(id.unknown.some((u) => /shareholder/i.test(u)));
+    // Standard: either observed by the chain interface probe (with basis), or null + listed unknown.
+    const s = id.identity.token_standard;
+    if (s === null) {
+      assert.ok(id.unknown.some((u) => /standard/i.test(u)), "unresolved standard must be listed unknown");
+    } else {
+      assert.equal(s, "ERC-20");
+      assert.ok(String(id.identity.token_standard_basis ?? "").length > 0, "resolved standard must state its basis");
+      assert.ok(!id.unknown.some((u) => /standard/i.test(u)), "resolved standard must clear the unknown line");
+    }
+    // Shareholder rights: either sourced from the live issuer page, or null/unknown — never invented.
+    const sh = id.legal_structure.direct_shareholder_rights;
+    if (sh === null || /Not established/.test(String(sh))) {
+      assert.ok(id.unknown.some((u) => /shareholder/i.test(u)));
+    } else {
+      assert.ok(/not direct equity ownership|economic exposure/i.test(String(sh)), "rights answer must quote the issuer's wording");
+      assert.ok(String(sh).includes("http"), "rights answer must cite its source URL");
+    }
     const d = id.identity.decimals;
     if (d === null) {
       assert.ok(id.unknown.some((u) => /decimals/i.test(u)), "unresolved decimals must be listed unknown");
       assert.equal(id.identity.decimals_source, null);
     } else {
       assert.ok(Number.isInteger(d) && d >= 0, "resolved decimals must be a real integer, never invented");
-      assert.equal(id.identity.decimals_source, "xStocks token list (Backed)");
+      assert.ok(typeof id.identity.decimals_source === "string" && id.identity.decimals_source.length > 0, "resolved decimals must name their source");
       assert.ok(!id.unknown.some((u) => /decimals/i.test(u)), "resolved decimals must clear the unknown line");
     }
     assert.ok(!("live" in id) && !("trading_activity" in id), "no market data in identify");

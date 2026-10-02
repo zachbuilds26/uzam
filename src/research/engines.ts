@@ -134,6 +134,108 @@ export async function verifyTokenlist(contract: string): Promise<{ listed: boole
   }
 }
 
+// ---- On-chain ERC-20 interface probe (public RPC, no key) ----
+// Decimals + symbol read straight from the contract, plus an interface
+// probe: a real ERC-20 answers decimals() and symbol(). Total supply is
+// observed too (chain data, never a backing claim). Negative-backoff on
+// failure so a dead RPC does not tax every request.
+const ERC20_SELECTORS = {
+  decimals: "0x313ce567",
+  symbol: "0x95d89b41",
+  totalSupply: "0x18160ddd",
+  balanceOf: "0x70a08231",
+} as const;
+
+let probeFailedAt = 0;
+
+function decodeUint(hex: string): bigint | null {
+  if (!/^0x[0-9a-fA-F]{1,64}$/.test(hex)) return null;
+  try { return BigInt(hex); } catch { return null; }
+}
+
+function decodeString(hex: string): string | null {
+  if (!/^0x[0-9a-fA-F]*$/.test(hex) || hex.length < 130) return null;
+  try {
+    const data = hex.slice(2);
+    const offset = Number(BigInt("0x" + data.slice(0, 64))) * 2;
+    const len = Number(BigInt("0x" + data.slice(offset, offset + 64)));
+    if (!Number.isInteger(len) || len < 0 || len > 256) return null;
+    const bytes = data.slice(offset + 64, offset + 64 + len * 2);
+    if (bytes.length !== len * 2) return null;
+    return Buffer.from(bytes, "hex").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export type Erc20Probe = {
+  available: boolean;
+  decimals: number | null;
+  onchain_symbol: string | null;
+  total_supply_raw: string | null;
+  contract_exists: boolean;
+  standard: "ERC-20" | null;
+  standard_basis: string;
+  error?: string;
+  data_timestamp: string;
+};
+
+export async function probeErc20(contract: string): Promise<Erc20Probe> {
+  const ts = now();
+  const miss: Erc20Probe = {
+    available: false, decimals: null, onchain_symbol: null, total_supply_raw: null,
+    contract_exists: false, standard: null,
+    standard_basis: "Interface probe unavailable — standard not established. Confirm on the chain explorer.",
+    error: "probe unavailable", data_timestamp: ts,
+  };
+  if (!/^0x[0-9a-fA-F]{40}$/.test(contract)) return miss;
+  if (Date.now() - probeFailedAt < 300_000) return { ...miss, error: "RPC probe backing off (recent failure)" };
+  const rpc = chainMeta().rpc ?? "https://rpc.xlayer.tech";
+  try {
+    const body = [
+      { jsonrpc: "2.0", id: 1, method: "eth_getCode", params: [contract, "latest"] },
+      { jsonrpc: "2.0", id: 2, method: "eth_call", params: [{ to: contract, data: ERC20_SELECTORS.decimals }, "latest"] },
+      { jsonrpc: "2.0", id: 3, method: "eth_call", params: [{ to: contract, data: ERC20_SELECTORS.symbol }, "latest"] },
+      { jsonrpc: "2.0", id: 4, method: "eth_call", params: [{ to: contract, data: ERC20_SELECTORS.totalSupply }, "latest"] },
+    ];
+    const res = await fetch(rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "uzam-mvp/0.1 (+research)" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
+    const json = await res.json() as AnyObj[];
+    if (!Array.isArray(json) || json.length < 4) throw new Error("RPC returned no batch");
+    const code = String(json[0]?.result ?? "");
+    const contract_exists = /^0x[0-9a-fA-F]+$/.test(code) && code.length > 2;
+    const decRaw = decodeUint(String(json[1]?.result ?? ""));
+    const sym = decodeString(String(json[2]?.result ?? ""));
+    const supply = decodeUint(String(json[3]?.result ?? ""));
+    const decimals = decRaw !== null && decRaw >= 0n && decRaw <= 255n ? Number(decRaw) : null;
+    // Standard claim only when BOTH standard view calls answer — that is the
+    // interface test, not a nameplate guess. Otherwise it stays null.
+    const standard = decimals !== null && sym !== null ? "ERC-20" as const : null;
+    return {
+      available: true,
+      decimals,
+      onchain_symbol: sym,
+      total_supply_raw: supply !== null ? supply.toString() : null,
+      contract_exists,
+      standard,
+      standard_basis: standard
+        ? `Contract answers ERC-20 view calls decimals() and symbol() on chain 196 via ${rpc} — standard observed by interface probe, not assumed.`
+        : contract_exists
+          ? "Contract code exists but ERC-20 view calls did not both answer — standard not established; confirm on the chain explorer."
+          : "No contract code returned for this address on chain 196 — token not observable on-chain right now.",
+      data_timestamp: ts,
+    };
+  } catch (e) {
+    probeFailedAt = Date.now();
+    return { ...miss, error: `RPC probe failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 // ---- Onchain gather (same flow as analyze_onchain: search -> price -> premium) ----
 export async function gatherOnchain(clean: string, asset: RegistryAsset): Promise<AnyObj> {
   const dataTimestamp = now();
@@ -394,6 +496,21 @@ export async function fetchLiveQuote(clean: string): Promise<AnyObj> {
 }
 
 // ---- Backing gather (same flow as analyze_backing: read official pages live) ----
+
+/** Issuer-stated dividend treatment (from the official dividends doc, cited). */
+export function dividendTreatment(): string {
+  const f: AnyObj = (registry as AnyObj).issuer_facts ?? {};
+  if (!f.dividend_treatment) return "UNKNOWN — no issuer statement on file; confirm in Final Terms.";
+  return `${f.dividend_treatment} Source: ${f.dividend_doc ?? f.source ?? "issuer documentation"}`;
+}
+
+/** Issuer-stated redemption access (from the official issuance doc, cited). */
+export function redemptionAccess(): string {
+  const f: AnyObj = (registry as AnyObj).issuer_facts ?? {};
+  if (!f.redemption_access) return "UNKNOWN — not confirmed from fetched pages; see excerpts and issuer terms.";
+  return `${f.redemption_access} Source: ${f.redemption_doc ?? f.source ?? "issuer documentation"}`;
+}
+
 export async function gatherBacking(asset: RegistryAsset): Promise<AnyObj> {
   const urls = [asset.official_website, ...asset.official_documents].filter(
     (u, i, arr): u is string => typeof u === "string" && u.startsWith("http") && arr.indexOf(u) === i
@@ -956,8 +1073,9 @@ export function summarizeResearch(r: AnyObj): string {
   findings.forEach((f, i) => lines.push(`${i + 1}. ${f.finding} [${f.evidence_ref ?? "no ref"}]`));
   const ident = r.identity ?? {};
   const idChecks = (ident.verification_checks as AnyObj[] | undefined) ?? [];
+  const idCore = (ident.identity ?? {}) as AnyObj;
   lines.push(`### ${L("sec_identity")}`);
-  lines.push(`- Contract: ${ident.identity?.contract_address ?? "UNKNOWN"} · Standard/decimals: UNKNOWN (see explorer)`);
+  lines.push(`- Contract: ${idCore.contract_address ?? "UNKNOWN"} · Standard: ${idCore.token_standard ?? "UNKNOWN"} · Decimals: ${idCore.decimals ?? "UNKNOWN"}${idCore.decimals_source ? ` (${idCore.decimals_source})` : ""}`);
   lines.push(`- ${L("sec_checks")}: ${idChecks.filter((c) => c.verified).length}/${idChecks.length} ${L("id_verified")}`);
   const bd = r.backing_detail ?? {};
   lines.push(`### ${L("sec_backing")} — ${L("lbl_claim")} / ${L("lbl_verified_fact")} / ${L("lbl_onchain_obs")} / ${L("lbl_unknown")}`);
@@ -1017,7 +1135,7 @@ export function summarizeResearch(r: AnyObj): string {
     if (fil.latest_10q) lines.push(`- Latest 10-Q: ${fil.latest_10q.date} — ${fil.latest_10q.url}`);
     if (fil.note) lines.push(`- ${fil.note}${fil.holdings_url ? ` See: ${fil.holdings_url}` : ""}`);
     if (div.underlying_last_amount) lines.push(`- Underlying last dividend: ${div.underlying_last_amount} on ${div.underlying_last_date ?? "unknown date"} (underlying stock — xStock passthrough: ${div.xstock_treatment ?? "UNKNOWN"}).`);
-    else if (!div.skipped) lines.push(`- No underlying dividend in last 12m of history. xStock passthrough treatment: UNKNOWN — confirm in Final Terms.`);
+    else if (!div.skipped) lines.push(`- No underlying dividend in last 12m of history. xStock treatment: ${dividendTreatment()}`);
   }
   // Exit & redemption: the "how do I get out" section buyers actually need.
   const red = r.redemption ?? {};
@@ -1233,26 +1351,71 @@ export async function buildIdentity(symbol: string, opts?: { lang?: string }): P
   const explorerContract = publishedOk
     ? `https://www.okx.com/web3/explorer/xlayer/token/${published}`
     : null;
-  // Decimals come from the independent xStocks tokenlist (cached 1h, same
-  // source as the listing check — no new fetch class, no OKX key needed).
-  // A cold cache can cost one ~20s fetch; afterwards it is instant.
-  let decimals: number | null = null;
-  if (publishedOk) {
+  // Live sources instead of UNKNOWN where the data genuinely exists:
+  // 1) contract interface probe (chain) → standard + decimals observed;
+  // 2) independent tokenlist → decimals fallback if the RPC probe fails;
+  // 3) issuer's official legal page (fetched fresh) → rights/jurisdiction.
+  const facts: AnyObj = (registry as AnyObj).issuer_facts ?? {};
+  const probe = publishedOk ? await probeErc20(published as string) : null;
+  let decimals: number | null = probe?.decimals ?? null;
+  let decimalsSource: string | null = decimals !== null ? "on-chain eth_call decimals() (X Layer RPC)" : null;
+  if (decimals === null && publishedOk) {
     const tl = await verifyTokenlist(published as string);
-    if (typeof tl.decimals === "number") decimals = tl.decimals;
+    if (typeof tl.decimals === "number") {
+      decimals = tl.decimals;
+      decimalsSource = "xStocks token list (Backed)";
+    }
   }
+  const standard = probe?.standard ?? null;
+  // Issuer legal page: fetched live, cached by the shared page reader.
+  let issuerDoc: AnyObj | null = null;
+  const legalUrl = typeof facts.source === "string" ? facts.source : null;
+  if (legalUrl) {
+    try {
+      const page = await fetchPage(legalUrl);
+      if (page.ok && page.text) issuerDoc = { url: page.url, text: page.text };
+    } catch { /* stays null → unknown */ }
+  }
+  const docText = issuerDoc ? issuerDoc.text as string : "";
+  const docHas = (re: RegExp): boolean => docText.length > 0 && re.test(docText);
+  const legalSrc = issuerDoc ? `(${facts.source_title ?? "issuer legal page"}, ${issuerDoc.url})` : "(issuer legal page unreachable — values below are registry-recorded issuer claims)";
+  const rights = issuerDoc
+    ? {
+        direct_shareholder_rights: docHas(/does not confer shareholder voting rights|not direct equity ownership|economic exposure/i)
+          ? `None — xStocks provide economic exposure only, not direct equity ownership. ${legalSrc}`
+          : `Not established from the live issuer page — confirm in Final Terms. ${legalSrc}`,
+        voting_rights: docHas(/does not confer shareholder voting rights/i)
+          ? `None — issuer states xStocks do not confer shareholder voting rights. ${legalSrc}`
+          : `Not established from the live issuer page — confirm in Final Terms. ${legalSrc}`,
+        jurisdiction: docHas(/Jersey Financial Services Commission|registered with the JFSC/i)
+          ? `Issuer incorporated in Jersey, registered with the Jersey Financial Services Commission (JFSC). ${legalSrc}`
+          : `Not established from the live issuer page. ${legalSrc}`,
+        eligibility: docHas(/United States, to U\.S\. Persons|prohibited jurisdiction/i)
+          ? `Not marketed to U.S. Persons or prohibited jurisdictions; distributors carry local compliance duty. ${legalSrc}`
+          : `Not established from the live issuer page. ${legalSrc}`,
+      }
+    : {
+        direct_shareholder_rights: facts.shareholder_rights ? `${facts.shareholder_rights} (${facts.source ?? "issuer documentation"})` : null,
+        voting_rights: facts.voting_rights ? `${facts.voting_rights} (${facts.source ?? "issuer documentation"})` : null,
+        jurisdiction: facts.jurisdiction ? `${facts.jurisdiction} (${facts.source ?? "issuer documentation"})` : null,
+        eligibility: facts.eligibility ? `${facts.eligibility} (${facts.source ?? "issuer documentation"})` : null,
+      };
   const unknown: string[] = [
-    "Token standard (e.g. ERC-20) — not recorded in the registry and not proven by the tokenlist entry. Confirm on the chain explorer.",
-    ...(decimals === null ? ["Decimals — not in the tokenlist entry either. Confirm on the chain explorer or via research (token meta)."] : []),
-    "Direct shareholder rights — UNKNOWN. The token tracks the underlying per the issuer's claim; whether it confers shareholder rights must be confirmed in the issuer's Final Terms.",
-    "Voting rights — UNKNOWN. Confirm in the issuer's Final Terms.",
-    "Jurisdiction and eligibility — UNKNOWN in this check. See research (issuer focus) for extracted geo passages.",
-    "Current issuer status — UNKNOWN. The registry is a snapshot; live status needs current issuer documentation.",
+    ...(standard === null ? ["Token standard (e.g. ERC-20) — interface probe did not establish it. Confirm on the chain explorer."] : []),
+    ...(decimals === null ? ["Decimals — not returned by the chain probe or tokenlist. Confirm on the chain explorer or via research (token meta)."] : []),
+    ...(probe && !probe.contract_exists ? ["No contract code observed at this address on chain 196 at probe time — token not visible on-chain right now."] : []),
+    ...(rights.direct_shareholder_rights === null || /Not established/.test(String(rights.direct_shareholder_rights)) ? ["Direct shareholder rights — not established from the live issuer page; confirm in the issuer's Final Terms."] : []),
+    ...(rights.voting_rights === null || /Not established/.test(String(rights.voting_rights)) ? ["Voting rights — not established from the live issuer page; confirm in the issuer's Final Terms."] : []),
+    ...(rights.jurisdiction === null || /Not established/.test(String(rights.jurisdiction)) ? ["Jurisdiction — not established from the live issuer page."] : []),
+    "Current issuer operational status (still issuing, solvency) — not checked here; the registry is a snapshot.",
     "Backing and reserves — out of scope for identify. See research (backing focus).",
   ];
   if (!contractListed && publishedOk && listedContracts.length > 0) {
     unknown.push("Registry contract list differs from the issuer-published address — treat the token as unverified until reconciled.");
   }
+  const crossCheck = probe?.onchain_symbol && probe.onchain_symbol.toUpperCase() !== asset.symbol.toUpperCase()
+    ? ` NOTE: contract's on-chain symbol() returns "${probe.onchain_symbol}", which does not match ${asset.symbol}.`
+    : "";
   return {
     service: "identify",
     found: true, symbol: asset.symbol, lang,
@@ -1266,18 +1429,23 @@ export async function buildIdentity(symbol: string, opts?: { lang?: string }): P
       network: chain.name,
       chain_id: chain.chainId,
       contract_address: published,
-      token_standard: null,
+      token_standard: standard,
+      token_standard_basis: probe?.standard_basis ?? "No chain probe result — standard not established.",
       decimals,
-      decimals_source: decimals !== null ? "xStocks token list (Backed)" : null,
+      decimals_source: decimalsSource,
+      onchain_symbol: probe?.onchain_symbol ?? null,
+      total_supply_wei: probe?.total_supply_raw ?? null,
+      onchain_probe: probe ? { available: probe.available, contract_exists: probe.contract_exists, timestamp: probe.data_timestamp, ...(probe.error ? { error: probe.error } : {}) } : null,
       asset_status: "tracked_in_registry — live status not checked in identify; use research for live data",
     },
     legal_structure: {
       instrument_type: asset.asset_type,
       represents: "Issuer describes the token as tracking the underlying 1:1 (ISSUER CLAIM — evidence in research, backing focus).",
-      direct_shareholder_rights: null,
-      voting_rights: null,
+      direct_shareholder_rights: rights.direct_shareholder_rights,
+      voting_rights: rights.voting_rights,
       legal_entity: asset.issuer_legal ?? null,
-      jurisdiction: null,
+      jurisdiction: rights.jurisdiction,
+      eligibility: rights.eligibility,
       official_product_documentation: asset.official_documents,
     },
     verification_checks: checks,
@@ -1285,15 +1453,17 @@ export async function buildIdentity(symbol: string, opts?: { lang?: string }): P
       product_page: asset.product_page ?? null,
       issuer_documentation: asset.official_website,
       legal_documentation: asset.official_documents,
+      issuer_legal_page_live: issuerDoc ? issuerDoc.url : null,
       chain_explorer_contract: explorerContract,
     },
     unknown,
     summary: `## ${asset.symbol} — ${asset.name} (${chain.name})\n` +
       `- ${asset.underlying_asset} · issued as ${asset.issuer}${asset.issuer_legal ? ` (${asset.issuer_legal})` : ""}\n` +
-      `- Contract: ${published ?? "UNKNOWN"} · Standard: UNKNOWN (see explorer) · Decimals: ${decimals ?? "UNKNOWN"}${decimals !== null ? " (tokenlist)" : ""}\n` +
+      `- Contract: ${published ?? "UNKNOWN"} · Standard: ${standard ?? "UNKNOWN (see explorer)"} · Decimals: ${decimals ?? "UNKNOWN"}${decimals !== null ? ` (${decimalsSource})` : ""}${crossCheck}\n` +
       `- Checks: ${checks.filter((c) => c.verified).length}/${checks.length} ${L("id_verified")}\n` +
-      `- Shareholder/voting rights, jurisdiction, live status: UNKNOWN — confirm in Final Terms; market data: see research.`,
-    confidence: "MEDIUM",
+      `- Rights: ${rights.voting_rights ? `voting — ${rights.voting_rights}` : "UNKNOWN"} · Jurisdiction: ${rights.jurisdiction ?? "UNKNOWN"}\n` +
+      `- Current issuer status/backing: see unknowns; market data: see research.`,
+    confidence: standard !== null && decimals !== null && issuerDoc ? "HIGH" : "MEDIUM",
     data_timestamp: ts,
   };
 }
@@ -1415,7 +1585,7 @@ export function buildRisksDetailed(ctx: {
       evidence: ["registry:underlying", "sec:edgar-filings"],
       current_observation: `Underlying ${ctx.underlyingCode}${ctx.exchange ? ` (${ctx.exchange})` : ""}; reference price ${ctx.underlyingPrice ?? "unavailable"}.`,
       what_it_means: "Token value follows one company's stock. Company-specific events affect the token's reference value.",
-      unknown_limitation: "Fundamentals, earnings quality and upcoming corporate actions not analyzed; dividend passthrough treatment UNKNOWN.",
+      unknown_limitation: "Fundamentals, earnings quality and upcoming corporate actions not analyzed. Dividend treatment per issuer docs: reinvested via multiplier, net of withholding (ISSUER CLAIM).",
     },
     {
       category: "tracking_pricing",
@@ -1711,7 +1881,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     dividend = {
       underlying_last_amount: divRes.amount, underlying_last_date: divRes.date,
       ...(divRes.error ? { error: divRes.error } : {}),
-      xstock_treatment: "UNKNOWN — whether this xStock passes through dividends must be confirmed in the issuer's Final Terms.",
+      xstock_treatment: dividendTreatment(),
     };
   } else if (isEtf) {
     filings = { note: "ETF underlying — no single-company 10-K. See holdings page.", holdings_url: asset.underlying?.sec_filings ?? null };
@@ -1880,7 +2050,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       excerpts: backing.redemption_excerpts ?? [],
       geo_excerpts: geoExcerpts,
       attestation_links: attestLinks,
-      who_can_redeem: "UNKNOWN — not confirmed from fetched pages; see excerpts and issuer terms.",
+      who_can_redeem: redemptionAccess(),
       confidence: backing.confidence,
     },
     underlying_detail: {
@@ -2029,7 +2199,7 @@ export function buildComparisonTable(reports: AnyObj[]): AnyObj[] {
     { category: "identity", metric: "network", get: (r) => cell(r, "X Layer (chainId 196)", "uzam registry") },
     { category: "identity", metric: "contract", get: (r) => cell(r, r.identity?.identity?.contract_address ?? null, "xStocks product data (issuer-published)") },
     { category: "legal", metric: "instrument_type", get: (r) => cell(r, r.asset?.asset_type ?? null, "uzam registry") },
-    { category: "legal", metric: "shareholder_rights", get: (r) => cell(r, "UNKNOWN — confirm in Final Terms", "uzam identify") },
+    { category: "legal", metric: "shareholder_rights", get: (r) => cell(r, r.identity?.legal_structure?.direct_shareholder_rights ?? "UNKNOWN — confirm in Final Terms", "issuer legal page (live)") },
     { category: "legal", metric: "official_docs", get: (r) => cell(r, `${(r.issuer?.documents ?? []).length} link(s) on file`, "uzam registry") },
     { category: "backing", metric: "model", get: (r) => cell(r, "tokenized-equity claim per issuer (claim, not verified)", "uzam backing focus") },
     { category: "backing", metric: "reserve_evidence", get: (r) => cell(r, ((r.backing_detail?.attestation_links ?? []).length > 0 ? `${(r.backing_detail.attestation_links as unknown[]).length} attestation link(s)` : "none found"), "uzam backing focus") },
