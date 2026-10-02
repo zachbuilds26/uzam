@@ -222,8 +222,8 @@ describe("langFallbackNote: unsupported languages are announced", () => {
 });
 
 describe("identify: verification checks, unknowns, no market data", () => {
-  it("returns 5 explicit checks with verified flags", () => {
-    const id = buildIdentity("AAPLx", { lang: "en" });
+  it("returns 5 explicit checks with verified flags", async () => {
+    const id = await buildIdentity("AAPLx", { lang: "en" });
     assert.equal(id.service, "identify");
     assert.equal(id.found, true);
     assert.equal(id.verification_checks.length, 5);
@@ -233,17 +233,25 @@ describe("identify: verification checks, unknowns, no market data", () => {
     }
     assert.ok(id.verification_checks.every((c) => c.verified), "registry AAPLx verifies all 5");
   });
-  it("leaves standard/decimals/rights unknown, never guessed", () => {
-    const id = buildIdentity("AAPLx", { lang: "en" });
+  it("never guesses standard/decimals/rights; decimals resolve or stay unknown consistently", async () => {
+    const id = await buildIdentity("AAPLx", { lang: "en" });
     assert.equal(id.identity.token_standard, null);
-    assert.equal(id.identity.decimals, null);
+    assert.ok(id.unknown.some((u) => /standard/i.test(u)));
     assert.equal(id.legal_structure.direct_shareholder_rights, null);
-    assert.ok(id.unknown.some((u) => /decimals/i.test(u)));
     assert.ok(id.unknown.some((u) => /shareholder/i.test(u)));
+    const d = id.identity.decimals;
+    if (d === null) {
+      assert.ok(id.unknown.some((u) => /decimals/i.test(u)), "unresolved decimals must be listed unknown");
+      assert.equal(id.identity.decimals_source, null);
+    } else {
+      assert.ok(Number.isInteger(d) && d >= 0, "resolved decimals must be a real integer, never invented");
+      assert.equal(id.identity.decimals_source, "xStocks token list (Backed)");
+      assert.ok(!id.unknown.some((u) => /decimals/i.test(u)), "resolved decimals must clear the unknown line");
+    }
     assert.ok(!("live" in id) && !("trading_activity" in id), "no market data in identify");
   });
-  it("not-found names supported symbols", () => {
-    const id = buildIdentity("ZZZ", { lang: "en" });
+  it("not-found names supported symbols", async () => {
+    const id = await buildIdentity("ZZZ", { lang: "en" });
     assert.equal(id.found, false);
     assert.ok(id.supported_symbols.includes("AAPLx"));
   });

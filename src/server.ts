@@ -98,7 +98,7 @@ const handler = createMcpHandler(() => {
     },
     async ({ symbol, lang }) => {
       try {
-        return { content: [{ type: "text", text: JSON.stringify(buildIdentity(symbol, { lang }), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(await buildIdentity(symbol, { lang }), null, 2) }] };
       } catch (e) {
         console.error("identify_asset failed:", e instanceof Error ? e.message : String(e));
         return { content: [{ type: "text", text: "Identity check failed with an internal error. Retry." }], isError: true as const };

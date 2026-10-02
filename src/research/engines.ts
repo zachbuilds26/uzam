@@ -80,11 +80,16 @@ let tlCache: { at: number; tokens: AnyObj[] } | null = null;
 let tlInflight: Promise<AnyObj[]> | null = null;
 let tlFailedAt = 0;
 
-function lookupTokenlist(contract: string): { listed: boolean; matched_symbol: string | null } {
+function lookupTokenlist(contract: string): { listed: boolean; matched_symbol: string | null; decimals: number | null } {
   const hit = tlCache?.tokens.find(
     (t) => Number(t.chainId) === CHAIN_ID_196 && String(t.address ?? "").toLowerCase() === contract.toLowerCase()
   );
-  return { listed: !!hit, matched_symbol: hit ? String((hit as AnyObj).symbol ?? "") : null };
+  const dec = hit ? Number((hit as AnyObj).decimals) : NaN;
+  return {
+    listed: !!hit,
+    matched_symbol: hit ? String((hit as AnyObj).symbol ?? "") : null,
+    decimals: Number.isInteger(dec) ? dec : null,
+  };
 }
 
 async function fetchTokenlist(): Promise<AnyObj[]> {
@@ -110,14 +115,14 @@ async function fetchTokenlist(): Promise<AnyObj[]> {
   return tlInflight;
 }
 
-export async function verifyTokenlist(contract: string): Promise<{ listed: boolean; matched_symbol: string | null; stale?: boolean; error?: string }> {
+export async function verifyTokenlist(contract: string): Promise<{ listed: boolean; matched_symbol: string | null; decimals: number | null; stale?: boolean; error?: string }> {
   const fresh = tlCache && Date.now() - tlCache.at < 3600_000;
   if (fresh) return lookupTokenlist(contract);
   // Negative backoff: a dead tokenlist host must not cost every request a
   // doomed 20s fetch (compare would pay it 4x serially — now in parallel).
   if (Date.now() - tlFailedAt < 300_000) {
     if (tlCache) return { ...lookupTokenlist(contract), stale: true };
-    return { listed: false, matched_symbol: null, error: "tokenlist fetch backing off (recent failure)" };
+    return { listed: false, matched_symbol: null, decimals: null, error: "tokenlist fetch backing off (recent failure)" };
   }
   try {
     await fetchTokenlist();
@@ -125,7 +130,7 @@ export async function verifyTokenlist(contract: string): Promise<{ listed: boole
   } catch (e) {
     tlFailedAt = Date.now();
     if (tlCache) return { ...lookupTokenlist(contract), stale: true };
-    return { listed: false, matched_symbol: null, error: `tokenlist fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+    return { listed: false, matched_symbol: null, decimals: null, error: `tokenlist fetch failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -1190,7 +1195,7 @@ export function summarizeCompare(c: AnyObj): string {
 // itself ties the field to an official source; otherwise "unverified".
 // Fields the registry cannot establish (standard, decimals, rights,
 // jurisdiction, live status) are UNKNOWN, never guessed.
-export function buildIdentity(symbol: string, opts?: { lang?: string }): AnyObj {
+export async function buildIdentity(symbol: string, opts?: { lang?: string }): Promise<AnyObj> {
   const lang = normalizeLang(opts?.lang);
   const L = (k: string): string => t(lang, k);
   const fallbackNote = langFallbackNote(opts?.lang, lang);
@@ -1228,9 +1233,17 @@ export function buildIdentity(symbol: string, opts?: { lang?: string }): AnyObj 
   const explorerContract = publishedOk
     ? `https://www.okx.com/web3/explorer/xlayer/token/${published}`
     : null;
+  // Decimals come from the independent xStocks tokenlist (cached 1h, same
+  // source as the listing check — no new fetch class, no OKX key needed).
+  // A cold cache can cost one ~20s fetch; afterwards it is instant.
+  let decimals: number | null = null;
+  if (publishedOk) {
+    const tl = await verifyTokenlist(published as string);
+    if (typeof tl.decimals === "number") decimals = tl.decimals;
+  }
   const unknown: string[] = [
-    "Token standard (e.g. ERC-20) — not recorded in the registry. Confirm on the chain explorer.",
-    "Decimals — not recorded in the registry. Confirm on the chain explorer or via research (token meta).",
+    "Token standard (e.g. ERC-20) — not recorded in the registry and not proven by the tokenlist entry. Confirm on the chain explorer.",
+    ...(decimals === null ? ["Decimals — not in the tokenlist entry either. Confirm on the chain explorer or via research (token meta)."] : []),
     "Direct shareholder rights — UNKNOWN. The token tracks the underlying per the issuer's claim; whether it confers shareholder rights must be confirmed in the issuer's Final Terms.",
     "Voting rights — UNKNOWN. Confirm in the issuer's Final Terms.",
     "Jurisdiction and eligibility — UNKNOWN in this check. See research (issuer focus) for extracted geo passages.",
@@ -1254,7 +1267,8 @@ export function buildIdentity(symbol: string, opts?: { lang?: string }): AnyObj 
       chain_id: chain.chainId,
       contract_address: published,
       token_standard: null,
-      decimals: null,
+      decimals,
+      decimals_source: decimals !== null ? "xStocks token list (Backed)" : null,
       asset_status: "tracked_in_registry — live status not checked in identify; use research for live data",
     },
     legal_structure: {
@@ -1276,7 +1290,7 @@ export function buildIdentity(symbol: string, opts?: { lang?: string }): AnyObj 
     unknown,
     summary: `## ${asset.symbol} — ${asset.name} (${chain.name})\n` +
       `- ${asset.underlying_asset} · issued as ${asset.issuer}${asset.issuer_legal ? ` (${asset.issuer_legal})` : ""}\n` +
-      `- Contract: ${published ?? "UNKNOWN"} · Standard/decimals: UNKNOWN (see explorer)\n` +
+      `- Contract: ${published ?? "UNKNOWN"} · Standard: UNKNOWN (see explorer) · Decimals: ${decimals ?? "UNKNOWN"}${decimals !== null ? " (tokenlist)" : ""}\n` +
       `- Checks: ${checks.filter((c) => c.verified).length}/${checks.length} ${L("id_verified")}\n` +
       `- Shareholder/voting rights, jurisdiction, live status: UNKNOWN — confirm in Final Terms; market data: see research.`,
     confidence: "MEDIUM",
@@ -1580,7 +1594,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     // No onchain, spot, filings or news fetches — only issuer/legal sections.
     // Plan-driven identity without docs uses the stub (no page fetches at all).
     const backingI = flags.needDocs ? await gatherBacking(asset) : docsStub;
-    const identityI = buildIdentity(clean, { lang });
+    const identityI = await buildIdentity(clean, { lang });
     const evI: AnyObj[] = Array.isArray(backingI.evidence) ? backingI.evidence : [];
     const registerI = buildSourceRegister(evI, [], {
       okxUsed: false, tokenlistUrl: TOKENLIST_RAW, tokenlistListed: false, spotSource: null, ts: now(),
@@ -1744,7 +1758,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     }
   }
   // ---- Dossier sections (additive — legacy keys below stay untouched) ----
-  const identity = buildIdentity(clean, { lang });
+  const identity = await buildIdentity(clean, { lang });
   const checksVerified = (identity.verification_checks as AnyObj[] ?? []).filter((c) => c.verified).length;
   const checksTotal = (identity.verification_checks as AnyObj[] ?? []).length;
   const conc = onchain.holder_concentration ?? {};

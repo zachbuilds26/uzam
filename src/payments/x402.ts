@@ -191,7 +191,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
     // Fast identity check: registry only, no fetches, no market analysis.
     const symbol = typeof req.body?.symbol === "string" ? req.body.symbol : "";
     const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
-    res.json({ ok: true, data: buildIdentity(symbol, { lang }) });
+    res.json({ ok: true, data: await buildIdentity(symbol, { lang }) });
   };
 
   // Public errors stay generic; details go to server logs only.
