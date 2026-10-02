@@ -127,6 +127,11 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
       res.status(400).json({ ok: false, error: "invalid focus: full|issuer|backing|risks" });
       return;
     }
+    const q: unknown = req.body?.question;
+    if (q !== undefined && (typeof q !== "string" || q.trim().length === 0 || q.trim().length > 500)) {
+      res.status(400).json({ ok: false, error: "invalid question: 1-500 characters" });
+      return;
+    }
   }
   if (route === "POST /api/compare") {
     const arr: unknown = req.body?.symbols;
@@ -167,8 +172,10 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
     const focusRaw: unknown = req.body?.focus;
     const focus = typeof focusRaw === "string" && (FOCUS as readonly string[]).includes(focusRaw) ? focusRaw : "full";
     const lang = typeof req.body?.lang === "string" ? req.body.lang : undefined;
+    const questionRaw: unknown = req.body?.question;
+    const question = typeof questionRaw === "string" && questionRaw.trim().length > 0 ? questionRaw.trim().slice(0, 500) : undefined;
     usage("research", symbol, req);
-    const result = await researchAsset(symbol, focus as "full" | "issuer" | "backing" | "risks", { price: PRICE_RESEARCH, lang });
+    const result = await researchAsset(symbol, focus as "full" | "issuer" | "backing" | "risks", { price: PRICE_RESEARCH, lang, question });
     res.json({ ok: true, data: result });
   };
 
@@ -230,7 +237,7 @@ function validatePaidBody(req: Request, res: Response, next: () => void): void {
   app.get("/openapi.json", (req: Request, res: Response) => {
     const base = `${req.protocol}://${req.get("host")}`;
     const symbolSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbol"] };
-    const researchSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, focus: { type: "string", enum: ["full", "issuer", "backing", "risks"] }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbol"] };
+    const researchSchema = { type: "object", properties: { symbol: { type: "string", example: "AAPLx" }, focus: { type: "string", enum: ["full", "issuer", "backing", "risks"] }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] }, question: { type: "string", maxLength: 500, example: "Who is the issuer?" } }, required: ["symbol"] };
     const compareSchema = { type: "object", properties: { symbols: { type: "array", items: { type: "string" }, example: ["AAPLx", "TSLAx"] }, lang: { type: "string", enum: ["en", "zh", "es", "fr"] } }, required: ["symbols"] };
     const asJson = (schema: unknown) => ({ content: { "application/json": { schema } } });
     res.json({

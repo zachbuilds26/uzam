@@ -461,11 +461,11 @@ const handler = createMcpHandler(() => {
     {
       description:
         "Evidence dossier on one X Layer tokenized stock/ETF (AAPLx, TSLAx, NVDAx, SPYx): research snapshot, 3-7 executive findings, backing split into issuer claim vs independently verified vs on-chain observation vs unknown, on-chain analysis, liquidity with calculated price impact, price relationship, 10 risk categories, mandatory unknowns and a source register. Ask the user for lang (en, zh, es, fr) — required (headers/labels translated, quotes stay in original language). Focus narrows the dossier: issuer (identity/legal only), backing (collateral evidence only), risks (risk sections only), full (everything). For a 60-second identity check use identify_asset; for side-by-side use compare_assets.",
-      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(TICKER_RE), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq }),
+      inputSchema: z.object({ symbol: z.string().trim().min(1).max(20).regex(TICKER_RE), focus: z.enum(["full", "issuer", "backing", "risks"]).optional(), lang: LangReq, question: z.string().trim().min(1).max(500).optional().describe("The user's research question — drives the internal research plan (which evidence to gather, what to skip). Optional; omit for a full dossier.") }),
     },
-    async ({ symbol, focus, lang }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string }) => {
+    async ({ symbol, focus, lang, question }: { symbol: string; focus?: "full" | "issuer" | "backing" | "risks"; lang?: string; question?: string }) => {
       try {
-        return { content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full", { lang }), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(await researchAsset(symbol, focus ?? "full", { lang, question }), null, 2) }] };
       } catch (e) {
         console.error("research_asset failed:", e instanceof Error ? e.message : String(e));
         return { content: [{ type: "text", text: "Research failed with an internal error. Retry — if it persists, try focus issuer or backing." }], isError: true as const };

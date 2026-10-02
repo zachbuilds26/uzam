@@ -26,6 +26,7 @@ import {
 } from "../src/research/engines.js";
 import { extractPassages, BACKING_KEYWORDS } from "../src/research/provider.js";
 import { normalizeLang, t, sev, langFallbackNote, SUPPORTED_LANGS } from "../src/research/i18n.js";
+import { planResearch, planFlags, ALL_EVIDENCE } from "../src/research/planner.js";
 
 describe("null-safety: gaps stay null, never become 0", () => {
   it("fmtMoney(null) is null, not 0.00", () => {
@@ -320,9 +321,53 @@ describe("dossier: 10 risks, 3-7 findings, side-by-side cells", () => {
   });
   it("new i18n keys exist in every pack", () => {
     for (const lang of SUPPORTED_LANGS) {
-      for (const k of ["sec_snapshot", "sec_findings", "sec_sources", "lbl_claim", "lbl_verified_fact", "lbl_onchain_obs", "lbl_calc", "id_verified"]) {
+      for (const k of ["sec_snapshot", "sec_plan", "sec_findings", "sec_sources", "lbl_claim", "lbl_verified_fact", "lbl_onchain_obs", "lbl_calc", "id_verified"]) {
         assert.notEqual(t(lang, k), k, `${lang}:${k}`);
       }
     }
+  });
+});
+
+describe("planner: question determines depth, skips carry reasons", () => {
+  it("issuer question routes to identity depth without market fetches", () => {
+    const p = planResearch("Who is the issuer?");
+    assert.equal(p.depth, "identity");
+    assert.ok(p.evidence_needed.includes("issuer_docs"));
+    assert.ok(!p.evidence_needed.includes("market"));
+    const f = planFlags(p);
+    assert.equal(f.needOnchain, false);
+    assert.equal(f.needDocs, true);
+    assert.equal(f.needNews, false);
+  });
+  it("risk question pulls the full matrix", () => {
+    const p = planResearch("Research the risks of this tokenized stock");
+    assert.equal(p.depth, "full");
+    assert.deepEqual([...p.evidence_needed].sort(), [...ALL_EVIDENCE].sort());
+    assert.deepEqual(p.skipped, []);
+  });
+  it("price question needs market+reference, skips filings/news with reasons", () => {
+    const p = planResearch("What is the premium vs the underlying price?");
+    assert.equal(p.depth, "targeted");
+    assert.ok(p.evidence_needed.includes("market") && p.evidence_needed.includes("reference"));
+    assert.ok(!p.evidence_needed.includes("filings") && !p.evidence_needed.includes("news"));
+    assert.ok(p.skipped.every((s) => s.reason.length > 0));
+    const f = planFlags(p);
+    assert.equal(f.needSpot, true);
+    assert.equal(f.needFilings, false);
+  });
+  it("empty and unknown questions default to full dossier, never less", () => {
+    for (const q of ["", "   ", "asdfgh qwerty zzz", undefined, null]) {
+      const p = planResearch(q);
+      assert.equal(p.depth, "full");
+      assert.deepEqual(p.skipped, []);
+    }
+  });
+  it("null plan means all gathers on (backwards compatible)", () => {
+    const f = planFlags(null);
+    assert.ok(f.needOnchain && f.needDocs && f.needSpot && f.needFilings && f.needDividend && f.needNews);
+  });
+  it("skipped_by_plan counts as zero coverage, never full", () => {
+    assert.deepEqual(okxCoverage(["skipped_by_plan"]), { ok: 0, total: 7 });
+    assert.deepEqual(okxCoverage(["skipped_by_plan: onchain not needed"]), { ok: 0, total: 7 });
   });
 });

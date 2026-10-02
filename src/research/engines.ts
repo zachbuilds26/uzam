@@ -10,6 +10,7 @@ import {
   tierOf, itemConfidence,
 } from "./provider.js";
 import { normalizeLang, t, sev, langFallbackNote } from "./i18n.js";
+import { planResearch, planFlags } from "./planner.js";
 import type { SourceType } from "./provider.js";
 
 type RegistryAsset = {
@@ -677,6 +678,7 @@ export function okxCoverage(missing: unknown): { ok: number; total: number } {
   const strs = missing.map((m) => String(m).split(":")[0].trim());
   if (
     strs.includes("skipped_by_focus") ||
+    strs.includes("skipped_by_plan") ||
     strs.includes("okx_credentials") ||
     strs.includes("asset_identity") ||
     strs.includes("contract_on_xlayer")
@@ -934,6 +936,15 @@ export function summarizeResearch(r: AnyObj): string {
   lines.push(`### ${L("sec_snapshot")}`);
   lines.push(`- ${snap.symbol ?? r.asset.symbol} · ${snap.underlying_asset ?? ""} · ${snap.issuer ?? ""} · ${snap.chain ?? "X Layer"}`);
   lines.push(`- Research timestamp: ${snap.research_timestamp ?? r.data_timestamp} · Sources: ${snap.sources ?? "n/a"} (${snap.primary_sources ?? "n/a"} primary, ${snap.onchain_sources ?? "n/a"} on-chain)`);
+  const rp = r.research_plan ?? null;
+  if (rp) {
+    lines.push(`### ${L("sec_plan")}`);
+    if (rp.question) lines.push(`- Question: "${String(rp.question).slice(0, 200)}"`);
+    lines.push(`- Needed: ${((rp.evidence_needed as string[] | undefined) ?? []).join(", ") || "full dossier"}`);
+    const skipped = ((rp.skipped as AnyObj[] | undefined) ?? []).map((s) => String(s.evidence));
+    if (skipped.length > 0) lines.push(`- Deliberately skipped: ${skipped.join(", ")} (not needed for this question)`);
+    if (rp.note) lines.push(`- ${rp.note}`);
+  }
   const findings = (r.executive_findings as AnyObj[] | undefined) ?? [];
   lines.push(`### ${L("sec_findings")}`);
   if (findings.length === 0) lines.push(`- None established — see unknowns.`);
@@ -1535,7 +1546,7 @@ export function buildFindings(ctx: {
 }
 
 // ---- research_asset: one-call full report ----
-export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full", opts?: { price?: string; lang?: string }): Promise<AnyObj> {
+export async function researchAsset(symbol: string, focus: "full" | "issuer" | "backing" | "risks" = "full", opts?: { price?: string; lang?: string; question?: string }): Promise<AnyObj> {
   const t0 = Date.now();
   const lang = normalizeLang(opts?.lang);
   const L = (k: string): string => t(lang, k);
@@ -1550,10 +1561,25 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       supported_symbols: supportedSymbols(), confidence: "UNKNOWN", data_timestamp: now(),
     };
   }
-  if (focus === "issuer") {
+  // Planner runs only on default focus — an explicit focus always wins.
+  // Unknown/empty questions fall back to the full dossier (never less evidence).
+  const plan = focus === "full" ? planResearch(opts?.question) : null;
+  const flags = planFlags(plan);
+  // Document stub when the plan excludes docs: same shape as gatherBacking's
+  // essentials, unknowns carrying the skip reason instead of gaps.
+  const docsStub: AnyObj = {
+    found: true, symbol: asset.symbol, name: asset.name,
+    issuer_claim: null, custodian: null, confidence: "UNKNOWN",
+    pages_read: [], evidence: [], redemption_excerpts: [],
+    geo_excerpts: [], attestation_links: [],
+    unanswered_questions: ["Document research skipped by the research plan — not needed for this question."],
+  };
+  const planIdentity = plan !== null && plan.depth === "identity";
+  if (focus === "issuer" || planIdentity) {
     // Issuer focus: identity + legal research from official documents.
     // No onchain, spot, filings or news fetches — only issuer/legal sections.
-    const backingI = await gatherBacking(asset);
+    // Plan-driven identity without docs uses the stub (no page fetches at all).
+    const backingI = flags.needDocs ? await gatherBacking(asset) : docsStub;
     const identityI = buildIdentity(clean, { lang });
     const evI: AnyObj[] = Array.isArray(backingI.evidence) ? backingI.evidence : [];
     const registerI = buildSourceRegister(evI, [], {
@@ -1587,17 +1613,19 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       unknowns: unknownsI,
       unknowns_mandatory: unknownsI,
       source_register: registerI,
+      research_plan: plan,
       note: "Issuer focus: identity + legal/document research only. No onchain, market, filings or news fetches performed.",
       confidence: { overall: "MEDIUM", identity: "HIGH", onchain: "UNKNOWN", backing: backingI.confidence ?? "UNKNOWN" },
       receipt: `${opts?.price ? `${L("rpt_paid")} ${opts.price}` : L("rpt_free")} · issuer focus, ${Array.isArray(backingI.pages_read) ? backingI.pages_read.length : 0} ${L("rpt_pages")} ${L("rpt_in")} ${secs}s · data ${now()}`,
       data_timestamp: now(),
     };
   }
-  const skipOnchain = focus === "backing";
-  const onchainStub: AnyObj = { found: true, symbol: asset.symbol, name: asset.name, chains: asset.chains, chainIds: asset.chainIds, onchain: null, missing: ["skipped_by_focus"], confidence: "UNKNOWN", data_timestamp: now() };
+  const skipOnchain = focus === "backing" || (plan !== null && !flags.needOnchain);
+  const skipWhy = focus === "backing" ? "skipped_by_focus" : "skipped_by_plan";
+  const onchainStub: AnyObj = { found: true, symbol: asset.symbol, name: asset.name, chains: asset.chains, chainIds: asset.chainIds, onchain: null, missing: [skipWhy], confidence: "UNKNOWN", data_timestamp: now() };
   const [onchain, backing] = await Promise.all([
     skipOnchain ? onchainStub : gatherOnchain(clean, asset),
-    gatherBacking(asset),
+    flags.needDocs ? gatherBacking(asset) : docsStub,
   ]);
   const econ = onchain.trading_activity ?? {};
   // Underlying spot + premium/discount (needs a token price; skipped otherwise).
@@ -1609,10 +1637,10 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
   type Spot = { price: number | null; date: string | null; time: string | null; stale?: boolean; error?: string };
   // Enrichment stages are independent once tokenPx is known — run together.
   // Each is guarded: a throw becomes an unknowns entry, never a lost report.
-  const wantRecent = focus === "full" || focus === "risks";
-  const wantSpot = Number.isFinite(tokenPx) && tokenPx > 0 && codeOk && focus !== "risks";
-  const wantFilings = focus !== "risks" && !isEtf && !!asset.underlying?.cik;
-  const wantDividend = wantFilings && codeOk;
+  const wantRecent = (focus === "full" || focus === "risks") && (!plan || flags.needNews);
+  const wantSpot = Number.isFinite(tokenPx) && tokenPx > 0 && codeOk && focus !== "risks" && (!plan || flags.needSpot);
+  const wantFilings = focus !== "risks" && !isEtf && !!asset.underlying?.cik && (!plan || flags.needFilings);
+  const wantDividend = wantFilings && codeOk && (!plan || flags.needDividend);
   const [recentRes, spotRes, filRes, divRes] = await Promise.all([
     (async (): Promise<{ items: AnyObj[]; note: string }> => {
       if (!wantRecent) return { items: [], note: "Skipped by focus." };
@@ -1870,6 +1898,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
     unknowns, evidence,
     // ---- Dossier product sections (Service 2) ----
     service: "research",
+    research_plan: plan,
     research_snapshot: snapshot,
     executive_findings: findings,
     identity,
@@ -1939,6 +1968,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       unknowns: report.unknowns,
       unknowns_mandatory: unknowns,
       source_register: sourceRegister,
+      research_plan: plan,
       confidence: report.confidence,
       summary: `## ${asset.symbol} — backing evidence\n- Issuer claim: ${cutWords(String(backing.issuer_claim ?? "none extracted"), 220)}\n- Independently verified: ${verifiedList.length} item(s) · On-chain observations: ${onchainObs.length}\n- Reserve amount: UNKNOWN — reconciliation not possible (see reconciliation note).`,
       receipt: report.receipt,
@@ -1955,6 +1985,7 @@ export async function researchAsset(symbol: string, focus: "full" | "issuer" | "
       risks: report.risks, risks_detailed: risksDetailed,
       unknowns: report.unknowns, unknowns_mandatory: unknowns,
       source_register: sourceRegister, evidence_count: evidence.length,
+      research_plan: plan,
       confidence: report.confidence,
       summary: `## ${report.asset.symbol} — top risks\n` + (report.risks as Risk[]).map((x) => `- **${x.category}** (${x.severity}): ${x.reason}`).join("\n"),
       receipt: report.receipt,
