@@ -71,6 +71,12 @@ a { color: inherit; }
   flex-direction: column;
 }
 
+.hero-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 .wrap {
   width: 100%;
   max-width: var(--wrap);
@@ -438,19 +444,20 @@ h1 .acc { color: var(--acc); }
 <body>
 <div class="page">
 
-  <header class="site-head rise" style="--d:0s">
-    <div class="wrap head-in">
-      <a class="brand" href="/" aria-label="Uzam home">
-        <img src="/uzam-logo.png" alt="" width="48" height="48" />
-        <span>Uzam</span>
-      </a>
-      <a class="btn btn-white" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a>
-    </div>
-  </header>
+  <div class="hero-screen">
+    <header class="site-head rise" style="--d:0s">
+      <div class="wrap head-in">
+        <a class="brand" href="/" aria-label="Uzam home">
+          <img src="/uzam-logo.png" alt="" width="48" height="48" />
+          <span>Uzam</span>
+        </a>
+        <a class="btn btn-white" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a>
+      </div>
+    </header>
 
-  <main>
-    <section class="hero">
-      <div class="wrap">
+    <main>
+      <section class="hero">
+        <div class="wrap">
         <div class="hero-in">
           <span class="badge rise" style="--d:.1s">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -479,6 +486,7 @@ h1 .acc { color: var(--acc); }
       </div>
     </section>
   </main>
+  </div>
 
   <footer class="site-foot rise" style="--d:.55s">
     <div class="wrap foot-in">
