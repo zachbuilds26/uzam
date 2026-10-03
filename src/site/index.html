@@ -88,7 +88,7 @@ a { color: inherit; }
 }
 
 @media (min-width: 900px) {
-  .site-head { padding-top: 48px; }
+  .site-head { padding-top: clamp(24px, 4vh, 48px); }
 }
 
 .head-in {
@@ -181,6 +181,12 @@ a { color: inherit; }
 
 /* ---------- hero ---------- */
 
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .hero {
   flex: 1;
   display: flex;
@@ -189,7 +195,7 @@ a { color: inherit; }
 }
 
 @media (min-width: 900px) {
-  .hero { padding: 121px 0; }
+  .hero { padding: clamp(36px, 8vh, 121px) 0; }
 }
 
 .hero-in {
@@ -203,7 +209,7 @@ a { color: inherit; }
 }
 
 @media (min-width: 900px) {
-  .hero-in { gap: 32px; }
+  .hero-in { gap: clamp(16px, 3vh, 32px); }
 }
 
 .badge {
@@ -236,7 +242,10 @@ h1 {
 }
 
 @media (min-width: 900px) {
-  h1 { line-height: .88; }
+  h1 {
+    font-size: min(clamp(40px, 7.6vw, 100px), 13vh);
+    line-height: .88;
+  }
 }
 
 h1 .acc { color: var(--acc); }
@@ -246,6 +255,10 @@ h1 .acc { color: var(--acc); }
   line-height: 1.5;
   color: var(--ink-a6);
   max-width: 720px;
+}
+
+@media (min-width: 900px) {
+  .lede { font-size: min(clamp(15px, 1.5vw, 22px), 2.6vh); }
 }
 
 .hero-actions {
@@ -268,7 +281,7 @@ h1 .acc { color: var(--acc); }
 }
 
 @media (min-width: 900px) {
-  .site-foot { padding: 110px 0 79px; }
+  .site-foot { padding: clamp(56px, 10vh, 110px) 0 clamp(48px, 7vh, 79px); }
 }
 
 .foot-in {
