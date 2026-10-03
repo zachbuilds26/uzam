@@ -1,433 +1,588 @@
 <!doctype html>
-<!-- Production deployment: Railway -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Uzam — Clear research for tokenized assets</title>
-<meta name="description" content="Uzam researches tokenized assets on X Layer with sourced evidence, live onchain data, risks, and unknowns." />
-<meta property="og:title" content="Uzam — Clear research for tokenized assets" />
-<meta property="og:description" content="Sourced research for tokenized assets on X Layer. No guessing." />
-<meta name="theme-color" content="#0f2623" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Uzam — RWA Intelligence research agent</title>
+<meta name="description" content="Uzam is an RWA intelligence MCP that gives AI agents the ability to investigate tokenized assets using onchain data, official documents, issuer information and evidence-backed research." />
+<meta property="og:title" content="Uzam — RWA Intelligence research agent" />
+<meta property="og:description" content="RWA intelligence MCP for AI agents. Onchain data, issuer documents, evidence-backed research." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://uzam-production-95f9.up.railway.app/uzam-logo.png" />
+<meta name="theme-color" content="#030807" />
+<link rel="icon" href="/uzam-logo.png" />
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap');
 
 :root {
-  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-ui: 'Space Grotesk', system-ui, sans-serif;
-  --bg: #0f2623;
-  --bg-2: #10352f;
-  --bg-3: #123d35;
-  --surface: #143f37;
-  --surface-2: #0d211f;
-  --ink: #9decce;
-  --ink-2: #aac9c2;
-  --muted: #7fa49c;
-  --faint: #52756e;
-  --line: rgba(170, 201, 194, .28);
-  --line-2: rgba(170, 201, 194, .17);
-  --accent: #9decce;
-  --on-accent: #0f2623;
-  --container: 1180px;
-  --gutter: clamp(20px, 5vw, 40px);
-  --section-y: clamp(4.5rem, 8vw, 8rem);
-  --r-sm: 8px;
-  --r: 14px;
-  --r-lg: 22px;
-  --r-pill: 999px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .16);
-  --shadow: 0 1px 3px rgba(0, 0, 0, .18), 0 24px 50px -30px rgba(0, 0, 0, .48);
-  --shadow-lg: 0 2px 6px rgba(0, 0, 0, .20), 0 40px 80px -40px rgba(0, 0, 0, .58);
-  --ease: cubic-bezier(.2, .7, .2, 1);
+  --bg: #030807;
+  --ink: #f4fbf9;
+  --ink-a8: rgba(244, 251, 249, .85);
+  --ink-a6: rgba(244, 251, 249, .62);
+  --ink-a3: rgba(244, 251, 249, .38);
+  --line: rgba(244, 251, 249, .16);
+  --line-2: rgba(244, 251, 249, .30);
+  --acc: #5ebeb3;
+  --on-acc: #04100d;
+  --font-d: 'Sora', sans-serif;
+  --font-t: 'Space Grotesk', sans-serif;
+  --wrap: 1300px;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; background: var(--bg); }
-body { font-family: var(--font-ui); font-weight: 500; background: var(--bg); color: var(--ink); line-height: 1.6; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: hidden; }
-img, svg { display: block; max-width: 100%; }
-a { color: inherit; text-decoration: none; }
-button, input, select { font: inherit; color: inherit; }
-button { background: none; border: none; cursor: pointer; }
-:where(a, button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-::selection { background: var(--accent); color: var(--on-accent); }
-.container { width: 100%; max-width: var(--container); margin: 0 auto; padding-inline: var(--gutter); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-.eyebrow { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-2); font: 600 .72rem var(--font-ui); letter-spacing: .15em; text-transform: uppercase; }
-.eyebrow::before, .eyebrow::after { content: ''; width: 22px; height: 1px; background: var(--line); }
-.eyebrow::before { display: none; }
-.eyebrow--center::before { display: block; }
-.display, h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--ink); letter-spacing: -.022em; }
-.display { line-height: 1.02; font-variation-settings: 'opsz' 48; }
-h1.display { font-size: clamp(2.8rem, 6.5vw, 5.4rem); }
-h2.display { font-size: clamp(2.1rem, 4.4vw, 3.45rem); line-height: 1.05; }
-.lead { max-width: 44ch; color: var(--ink-2); font: 500 clamp(1.04rem, 1.4vw, 1.2rem)/1.55 var(--font-ui); }
+html { -webkit-text-size-adjust: 100%; }
 
-/* Werk's visual rhythm: a slim announcement strip, sticky wordmark nav, and a quiet menu panel. */
-.topbar { position: relative; z-index: 51; background: var(--bg-2); color: var(--ink-2); border-bottom: 1px solid var(--line-2); }
-.topbar-inner { height: 40px; display: flex; align-items: center; justify-content: center; }
-.topbar-link { display: inline-flex; align-items: center; gap: 12px; font: 500 .78rem var(--font-ui); }
-.topbar-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); }
-.topbar-cta { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 600; }
-.topbar-cta span { transition: transform .25s var(--ease); }
-.topbar-link:hover .topbar-cta span { transform: translateX(3px); }
-.site-header { position: relative; z-index: 50; background: var(--bg); }
-.header-actions { display: flex; align-items: center; gap: 12px; }
-.header-inner { height: 84px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.wordmark { display: inline-flex; align-items: center; gap: .46em; color: var(--ink); font: 600 1.55rem/1 var(--font-display); letter-spacing: -.02em; }
-.hex { width: 1.35em; height: 1.35em; }
-.primary-nav { display: none; }
-.header-action { display: inline-flex; align-items: center; justify-content: center; gap: .5em; padding: 11px 22px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink); font: 600 .92rem var(--font-ui); transition: transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease); }
-.header-action::after { content: '↗'; transition: transform .25s var(--ease); }
-.header-action:hover { background: var(--bg-2); border-color: var(--line); transform: translateY(-1px); }
-.header-action:hover::after { transform: translateX(3px); }
-.menu-toggle { width: 50px; height: 50px; display: grid; place-items: center; color: var(--ink); border-radius: var(--r-sm); font-size: 1.3rem; line-height: 1; transition: background .2s var(--ease); }
-.menu-toggle:hover { background: var(--bg-2); }
-.menu-panel { display: none; position: absolute; left: 0; right: 0; top: 100%; background: var(--surface-2); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-lg); }
-.site-header.menu-open .menu-panel { display: block; animation: menu-in .28s var(--ease); }
-@keyframes menu-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-.menu-panel-inner { padding: 22px var(--gutter) 26px; max-width: var(--container); margin: 0 auto; }
-.menu-label { margin-bottom: 15px; color: var(--muted); font: 600 .7rem var(--font-ui); letter-spacing: .15em; text-transform: uppercase; }
-.menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
-.menu-item { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 18px 20px; background: var(--surface); transition: background .2s var(--ease); }
-.menu-item:hover { background: var(--bg-3); }
-.menu-item strong { color: var(--ink); font: 600 1rem/1.15 var(--font-display); }
-.menu-item small { max-width: 25ch; color: var(--muted); font: 500 .8rem/1.4 var(--font-ui); }
-.menu-item b { position: absolute; top: 17px; right: 18px; color: var(--muted); font-weight: 400; transition: transform .2s var(--ease), color .2s var(--ease); }
-.menu-item:hover b { color: var(--ink); transform: translateX(3px); }
-.menu-panel .header-action { margin-top: 18px; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-t);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 
-/* Werk-style centered hero with a real-looking product surface, retaining Uzam's palette and copy. */
-.hero { position: relative; padding: clamp(1.5rem, 3vw, 2.75rem) 0 clamp(3rem, 6vw, 5rem); text-align: center; overflow: hidden; }
-.hero::before, .hero::after { content: ''; position: absolute; z-index: -1; border-radius: 999px; filter: blur(46px); pointer-events: none; }
-.hero::before { width: 34vw; height: 26vw; left: -12vw; top: 6%; background: rgba(78, 173, 146, .13); }
-.hero::after { width: 28vw; height: 26vw; right: -8vw; bottom: 14%; background: rgba(157, 236, 206, .10); }
-.hero-inner { display: flex; flex-direction: column; align-items: center; gap: clamp(2.4rem, 5vw, 3.7rem); }
-.hero-copy-wrap { display: flex; flex-direction: column; align-items: center; max-width: 880px; }
-.hero-title { margin-top: 18px; }
-.hero-title em { color: var(--muted); font-style: normal; }
-.hero-sub { margin-top: 22px; max-width: 47ch; }
-.hero-actions { display: flex; flex-wrap: nowrap; justify-content: center; gap: 12px; margin-top: 28px; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: .55em; padding: 13px 22px; border: 1px solid transparent; border-radius: var(--r-sm); background: var(--accent); color: var(--on-accent); font: 600 .94rem var(--font-ui); white-space: nowrap; transition: transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease), color .25s var(--ease), box-shadow .25s var(--ease); }
-.button:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
-.button::first-letter { color: inherit; }
-.button.secondary { background: transparent; border-color: var(--line); color: var(--ink); }
-.button.secondary:hover { background: var(--bg-2); border-color: var(--ink); }
-.button .arrow { transition: transform .25s var(--ease); }
-.button:hover .arrow { transform: translateX(3px); }
-.hero-demo { width: 100%; max-width: 920px; }
-.preview { position: relative; width: 100%; padding: clamp(12px, 2vw, 20px) clamp(8px, 1.8vw, 18px) 0; text-align: left; }
-.preview::before, .preview::after { content: ''; position: absolute; z-index: -1; border-radius: 999px; filter: blur(28px); }
-.preview::before { width: 34%; height: 42%; left: -1%; top: 7%; background: rgba(78, 173, 146, .22); }
-.preview::after { width: 30%; height: 35%; right: 0; bottom: 7%; background: rgba(157, 236, 206, .16); }
-.preview-window { overflow: hidden; border: 1px solid var(--line); border-radius: clamp(18px, 2.8vw, 26px); background: rgba(18, 61, 53, .94); box-shadow: var(--shadow-lg); }
-.preview-bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 17px; border-bottom: 1px solid var(--line); background: rgba(13, 33, 31, .76); }
-.preview-dots { display: inline-flex; gap: 5px; }
-.preview-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
-.preview-dots i:first-child { background: var(--accent); }
-.preview-word { margin-left: 3px; color: var(--ink); font: 600 1rem var(--font-display); letter-spacing: -.04em; }
-.preview-bar-title { color: var(--muted); font: 500 .75rem var(--font-ui); }
-.preview-status { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 8px; border-radius: var(--r-pill); background: rgba(157, 236, 206, .10); color: var(--ink-2); font: 600 .63rem var(--font-ui); letter-spacing: .05em; text-transform: uppercase; }
-.preview-status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
-.preview-body { display: grid; grid-template-columns: 205px 1fr; min-height: 340px; }
-.preview-side { display: flex; flex-direction: column; gap: 4px; padding: 17px 11px; border-right: 1px solid var(--line); background: rgba(13, 33, 31, .45); }
-.preview-side-label { display: flex; align-items: center; gap: 6px; margin: 2px 7px 6px; color: var(--muted); font: 600 .61rem var(--font-ui); letter-spacing: .13em; text-transform: uppercase; }
-.preview-side-label::before { content: '◈'; color: var(--accent); font-size: .72rem; }
-.preview-nav { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--muted); font: 500 .75rem var(--font-ui); }
-.preview-nav.active { background: var(--bg-3); color: var(--ink); box-shadow: var(--shadow-sm); }
-.preview-rule { height: 1px; margin: 11px 5px; background: var(--line); }
-.preview-file { display: flex; align-items: center; gap: 7px; padding: 7px 8px; color: var(--ink-2); font: 500 .69rem var(--font-ui); }
-.preview-file b { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; background: rgba(157, 236, 206, .12); color: var(--accent); font-size: .68rem; }
-.preview-main { min-width: 0; padding: 23px clamp(18px, 3.2vw, 34px) 20px; }
-.preview-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--muted); font: 600 .62rem var(--font-ui); letter-spacing: .14em; text-transform: uppercase; }
-.preview-eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(157, 236, 206, .12); }
-.preview-question { width: min(100%, 360px); margin: 9px 0 19px auto; padding: 13px 14px 10px; border-radius: 15px 15px 5px 15px; background: linear-gradient(145deg, #1a5a4c, #123c35); color: var(--ink); box-shadow: 0 12px 20px -16px rgba(0, 0, 0, .72); }
-.preview-question p { font: 500 clamp(.72rem, 1.35vw, .82rem)/1.45 var(--font-ui); }
-.preview-sent { display: flex; justify-content: flex-end; gap: 4px; margin-top: 7px; color: var(--muted); font: 500 .61rem var(--font-ui); }
-.preview-response { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 18px; }
-.preview-agent { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: var(--accent); color: var(--on-accent); font: 700 .75rem var(--font-ui); box-shadow: 0 8px 15px -11px var(--accent); }
-.preview-response p { padding-top: 2px; color: var(--ink-2); font: 500 .78rem/1.45 var(--font-ui); }
-.preview-scan { display: flex; gap: 4px; height: 12px; align-items: center; margin-top: 6px; }
-.preview-scan i { width: 4px; height: 4px; border-radius: 99px; background: var(--accent); animation: scan-dot 1.2s ease-in-out infinite; }
-.preview-scan i:nth-child(2) { animation-delay: .14s; } .preview-scan i:nth-child(3) { animation-delay: .28s; }
-.preview-report { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: rgba(15, 38, 35, .84); box-shadow: var(--shadow); }
-.preview-report-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: rgba(16, 53, 47, .72); color: var(--ink-2); font: 600 .67rem var(--font-ui); }
-.preview-report-head span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); } .preview-report-head small { color: var(--muted); font: 500 .62rem var(--font-ui); }
-.preview-cards { display: grid; gap: 1px; background: var(--line); }
-.preview-card { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--surface-2); }
-.preview-card-icon { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: rgba(157, 236, 206, .12); color: var(--accent); font-size: .72rem; }
-.preview-card-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; } .preview-card-copy b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font: 600 .72rem var(--font-ui); } .preview-card-copy small { color: var(--muted); font: 500 .61rem var(--font-ui); }
-.preview-card-ready { margin-left: auto; color: var(--accent); font-size: .85rem; }
-.preview-finish { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: rgba(157, 236, 206, .06); color: var(--ink-2); font: 600 .67rem var(--font-ui); }
-.preview-timeline { display: flex; align-items: center; gap: 18px; padding: 13px 12px 14px; color: var(--muted); font: 600 .64rem var(--font-ui); letter-spacing: .04em; text-transform: uppercase; }
-.preview-timeline span { display: inline-flex; align-items: center; gap: 5px; } .preview-timeline i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); } .preview-timeline .current { color: var(--ink); } .preview-timeline .current i { background: var(--accent); } .preview-timeline > div { flex: 1; height: 2px; border-radius: 99px; background: var(--line); }
-@keyframes scan-dot { 0%,70%,100% { opacity: .28; transform: scale(.85); } 35% { opacity: 1; transform: scale(1); } }
+::selection { background: var(--acc); color: var(--on-acc); }
 
-.section { padding-block: var(--section-y); border-top: 1px solid var(--line-2); }
-.section--alt { background: var(--bg-2); }
-.section-head { max-width: 650px; margin: 0 auto clamp(2rem, 4vw, 2.8rem); text-align: center; }
-.section-head .lead { margin: 18px auto 0; }
-.section-title { margin-top: 18px; }
-.intro-grid, .strategy-layout, .architecture, .insights-layout { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: start; }
-.intro-grid h2, .strategy-intro h2, .architecture h2, .insights-title h2 { margin-top: 18px; font: 600 clamp(2rem, 4.1vw, 3.15rem)/1.05 var(--font-display); letter-spacing: -.025em; }
-.intro-copy, .strategy-intro > p:not(.eyebrow), .architecture-copy { max-width: 52ch; color: var(--ink-2); font: 500 clamp(1.03rem, 1.35vw, 1.17rem)/1.58 var(--font-ui); }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 34px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r); overflow: hidden; }
-.stat { padding: 18px 15px; background: var(--surface); } .stat strong { display: block; color: var(--ink); font: 600 clamp(1.65rem, 3vw, 2.35rem)/1 var(--font-display); } .stat span { display: block; margin-top: 7px; color: var(--muted); font: 500 .7rem var(--font-ui); letter-spacing: .06em; text-transform: uppercase; }
+a { color: inherit; }
 
-.strategy-list { display: grid; gap: 10px; }
-.strategy-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) 24px; align-items: start; gap: 16px; padding: 21px 22px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: transform .3s var(--ease), background .25s var(--ease), border-color .25s var(--ease), box-shadow .3s var(--ease); }
-.strategy-card:hover { transform: translateY(-2px); background: var(--bg-3); border-color: var(--line); box-shadow: var(--shadow); }
-.strategy-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 .8rem var(--font-ui); }
-.strategy-number { display: block; margin-top: 4px; color: var(--muted); font: 600 .72rem var(--font-ui); letter-spacing: .08em; }
-.strategy-card h3 { color: var(--ink); font: 600 1.12rem/1.15 var(--font-display); } .strategy-card p { margin-top: 7px; color: var(--muted); font: 500 .86rem/1.48 var(--font-ui); }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
-.live-section { background: var(--bg-2); }
-.live-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: center; }
-.live-layout h2 { margin-top: 18px; font: 600 clamp(2.2rem, 4.5vw, 3.55rem)/1.02 var(--font-display); } .live-layout .lead { margin-top: 18px; }
-.trybox { overflow: hidden; border: 1px solid var(--line); border-radius: clamp(18px, 2.6vw, 26px); background: var(--surface-2); box-shadow: var(--shadow-lg); }
-.trybox-top { display: flex; justify-content: space-between; align-items: center; padding: 17px 20px; border-bottom: 1px solid var(--line); background: var(--surface); } .trybox-top strong { color: var(--ink); font: 600 1rem var(--font-display); } .trybox-top span { color: var(--muted); font: 600 .66rem var(--font-ui); letter-spacing: .13em; text-transform: uppercase; }
-.tryrow { display: flex; gap: 10px; padding: 16px 20px 0; } .tryrow:last-of-type { padding-bottom: 16px; }
-.tryrow select { min-width: 0; flex: 1; padding: 12px 13px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg-2); color: var(--ink); font: 500 .84rem var(--font-ui); } .tryrow select:focus { border-color: var(--accent); }
-.tryrow .button { flex: 1; } .tryrow .button:disabled { opacity: .48; cursor: wait; transform: none; box-shadow: none; }
-#tryStatus { min-height: 22px; padding: 0 20px 8px; color: var(--muted); font: 600 .72rem var(--font-ui); } #tryStatus.err { color: #ffaaa0; }
-.result-output { min-height: 190px; margin: 0 20px 20px; padding: 18px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: #0a1a18; color: var(--ink-2); font: 500 .86rem/1.6 var(--font-ui); }
-.result-output h3 { margin: 0 0 10px; color: var(--ink); font: 600 1.05rem/1.2 var(--font-display); }
-.result-output h3:not(:first-child) { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
-.result-output p { margin: 0 0 12px; }
-.result-output p:last-child { margin-bottom: 0; }
-.result-output ul, .result-output ol { margin: 0 0 14px 20px; padding: 0; }
-.result-output li { margin: 5px 0; padding-left: 3px; }
-.result-output strong { color: var(--ink); font-weight: 700; }
-.result-output em { color: var(--ink); }
-.result-output code { padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: rgba(157, 236, 206, .08); }
-.result-output a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.answer-row { display: grid; grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr); gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
-.answer-row:last-child { border-bottom: 0; }
-.answer-label { color: var(--muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-.answer-value { min-width: 0; color: var(--ink-2); }
-.answer-muted { color: var(--muted); }
-.answer-error { color: #ffaaa0; }
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
-.architecture { align-items: center; }
-.architecture-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 28px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
-.architecture-card { min-height: 205px; padding: 24px 20px; background: var(--surface); transition: background .25s var(--ease); } .architecture-card:hover { background: var(--bg-3); }
-.card-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 .78rem var(--font-ui); }
-.card-index { display: block; margin-bottom: 12px; color: var(--muted); font: 600 .64rem var(--font-ui); letter-spacing: .12em; text-transform: uppercase; } .architecture-card h3 { font: 600 1.1rem/1.15 var(--font-display); } .architecture-card p { margin-top: 9px; color: var(--muted); font: 500 .82rem/1.48 var(--font-ui); }
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 
-.pricing-head { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6.5rem); align-items: end; margin-bottom: 30px; } .pricing-head h2 { font: 600 clamp(2.25rem, 4.8vw, 3.8rem)/1 var(--font-display); } .pricing-head p { max-width: 50ch; color: var(--ink-2); font: 500 1rem/1.55 var(--font-ui); }
-.price-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
-.price-card { min-height: 172px; padding: 21px 17px; background: var(--surface); } .price-card:hover { background: var(--bg-3); } .price-card h3 { font: 600 1rem/1.12 var(--font-display); } .price { margin-top: 24px; color: var(--ink); font: 600 1.6rem/1 var(--font-display); } .price small { color: var(--muted); font: 500 .68rem var(--font-ui); } .price-card p { margin-top: 9px; color: var(--muted); font: 500 .76rem/1.4 var(--font-ui); }
-.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 28px; border: 1px solid var(--line); background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
-.trust-card { min-height: 175px; padding: 22px 18px; background: var(--bg-2); } .trust-card:hover { background: var(--surface); } .trust-card .card-icon { margin-bottom: 18px; background: transparent; border: 1px solid var(--line); color: var(--ink); } .trust-card h3 { font: 600 1rem/1.16 var(--font-display); } .trust-card p { margin-top: 9px; color: var(--muted); font: 500 .78rem/1.45 var(--font-ui); } code { color: var(--ink); font: 600 .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding-left: clamp(20px, 4vw, 70px);
+  padding-right: clamp(20px, 4vw, 70px);
+}
 
-.insights { background: var(--bg-2); } .insights-title .button { margin-top: 25px; } .article-list { display: grid; gap: 10px; } .article { display: grid; grid-template-columns: 42px minmax(0, 1fr) 24px; gap: 16px; align-items: start; padding: 20px 21px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: transform .3s var(--ease), background .25s var(--ease), box-shadow .3s var(--ease); } .article:hover { transform: translateY(-2px); background: var(--bg-3); box-shadow: var(--shadow); } .article-index { color: var(--muted); font: 600 .75rem var(--font-ui); letter-spacing: .08em; } .article h3 { font: 600 1.08rem/1.15 var(--font-display); } .article p { margin-top: 7px; color: var(--muted); font: 500 .82rem/1.45 var(--font-ui); } .article .arrow { color: var(--muted); transition: transform .25s var(--ease), color .25s var(--ease); } .article:hover .arrow { color: var(--ink); transform: translateX(3px); }
+/* ---------- header ---------- */
 
-.cta { padding-block: clamp(3.4rem, 6vw, 6rem); } .cta-inner { position: relative; overflow: hidden; padding: clamp(2.4rem, 4.6vw, 4rem); border: 1px solid var(--line); border-radius: clamp(18px, 2.6vw, 26px); background: var(--bg-2); text-align: center; } .cta-inner::after { content: ''; position: absolute; width: 220px; height: 220px; right: -80px; bottom: -120px; border-radius: 50%; background: rgba(157, 236, 206, .10); filter: blur(12px); } .cta-inner h2 { font: 600 clamp(2.2rem, 4.6vw, 3.5rem)/1 var(--font-display); } .cta-inner p { max-width: 48ch; margin: 14px auto 0; color: var(--ink-2); font: 500 clamp(1rem, 1.3vw, 1.16rem)/1.46 var(--font-ui); } .cta-inner .button { margin-top: 23px; position: relative; z-index: 1; background: var(--ink); color: var(--on-accent); }
+.site-head {
+  padding-top: 25px;
+  position: relative;
+  z-index: 2;
+}
 
-.site-footer { border-top: 1px solid var(--line); padding-top: 1.8rem; } .footer-layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(2rem, 6vw, 6rem); padding-bottom: 3.2rem; } .footer-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; } .footer-group { display: flex; flex-direction: column; gap: 10px; } .footer-group h3 { margin-bottom: 7px; color: var(--muted); font: 600 .68rem var(--font-ui); letter-spacing: .14em; text-transform: uppercase; } .footer-group a { color: var(--ink-2); font: 500 .83rem var(--font-ui); transition: color .2s var(--ease); } .footer-group a:hover { color: var(--ink); } .newsletter h2 { font: 600 clamp(1.7rem, 3vw, 2.35rem)/1.05 var(--font-display); } .newsletter p { max-width: 35ch; margin-top: 9px; color: var(--muted); font: 500 .86rem/1.5 var(--font-ui); } .subscribe { display: flex; gap: 8px; margin-top: 20px; } .subscribe input { min-width: 0; flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); } .subscribe input::placeholder { color: var(--muted); } .subscribe .button { padding-inline: 17px; } .footer-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-block: 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font: 500 .78rem var(--font-ui); } .footer-bottom .wordmark { font-size: 1.2rem; } .disclaimer { padding-bottom: 1.6rem; color: var(--faint); font: 500 .7rem/1.5 var(--font-ui); }
+@media (min-width: 900px) {
+  .site-head { padding-top: 48px; }
+}
 
-@media (max-width: 1000px) { .intro-grid, .strategy-layout, .architecture, .live-layout, .pricing-head, .insights-layout { grid-template-columns: 1fr; gap: 2.3rem; } .strategy-intro, .architecture > div:first-child, .insights-title { max-width: 650px; } .price-grid { grid-template-columns: repeat(3, 1fr); } .trust-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 700px) { :root { --gutter: 20px; } .header-inner { height: 72px; } .header-action { padding-inline: 16px; font-size: .82rem; } .menu-grid { grid-template-columns: 1fr; } .hero { padding-top: 1.3rem; } .tryrow, .subscribe { flex-direction: column; } .tryrow .button, .subscribe .button { width: 100%; } .preview-body { grid-template-columns: 1fr; } .preview-side { display: none; } .preview-main { padding: 19px 15px 16px; } .preview-timeline { gap: 9px; font-size: .54rem; } .stats { grid-template-columns: 1fr; } .architecture-cards, .price-grid { grid-template-columns: 1fr; } .price-card { min-height: 0; } .trust-grid { grid-template-columns: 1fr; } .footer-layout { grid-template-columns: 1fr; gap: 2.6rem; } .footer-groups { gap: 18px; } .article { grid-template-columns: 30px minmax(0, 1fr) 20px; gap: 10px; } }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; } }
+.head-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.brand img {
+  width: 40px;
+  height: 40px;
+  display: block;
+}
+
+.brand span {
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 900px) {
+  .brand img { width: 48px; height: 48px; }
+  .brand span { font-size: 28px; }
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-t);
+  font-weight: 600;
+  font-size: clamp(14px, 1.1vw, 16px);
+  line-height: 1;
+  padding: 15px 27px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .15s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.btn:active { transform: scale(.98); }
+
+.btn-white {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.btn-white:hover { background: #ffffff; }
+
+.btn-solid {
+  background: var(--acc);
+  color: var(--on-acc);
+}
+
+.btn-solid:hover { filter: brightness(1.07); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+}
+
+.btn-ghost:hover { border-color: var(--ink); }
+
+.ic {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.ic-check { display: none; }
+
+.is-copied .ic-check { display: block; }
+.is-copied .ic-copy { display: none; }
+
+/* ---------- hero ---------- */
+
+.hero {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 57px 0;
+}
+
+@media (min-width: 900px) {
+  .hero { padding: 121px 0; }
+}
+
+.hero-in {
+  max-width: 794px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .hero-in { gap: 32px; }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 17px;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 500;
+  letter-spacing: .02em;
+  color: var(--ink-a6);
+}
+
+.badge svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink);
+}
+
+h1 {
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: clamp(40px, 7.6vw, 100px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+@media (min-width: 900px) {
+  h1 { line-height: .88; }
+}
+
+h1 .acc { color: var(--acc); }
+
+.lede {
+  font-size: clamp(15px, 1.5vw, 22px);
+  line-height: 1.5;
+  color: var(--ink-a6);
+  max-width: 720px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .hero-actions { width: 100%; }
+  .hero-actions .btn { width: 100%; }
+}
+
+/* ---------- footer ---------- */
+
+.site-foot {
+  border-top: 1px solid var(--line);
+  padding: 56px 0 64px;
+}
+
+@media (min-width: 900px) {
+  .site-foot { padding: 110px 0 79px; }
+}
+
+.foot-in {
+  display: flex;
+  flex-direction: column;
+  gap: 52px;
+}
+
+@media (min-width: 1024px) {
+  .foot-in {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 40px;
+  }
+}
+
+.foot-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.foot-tag {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-a8);
+  max-width: 300px;
+}
+
+.foot-year {
+  margin-top: 34px;
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: clamp(20px, 1.7vw, 32px);
+  letter-spacing: -0.01em;
+}
+
+.foot-right {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+@media (min-width: 1024px) {
+  .foot-right {
+    flex: 1;
+    max-width: 740px;
+    margin-left: auto;
+  }
+}
+
+.foot-h {
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: clamp(20px, 1.7vw, 32px);
+  letter-spacing: -0.01em;
+}
+
+.foot-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.foot-links a,
+.foot-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-d);
+  font-weight: 500;
+  font-size: clamp(20px, 1.6vw, 30px);
+  letter-spacing: -0.01em;
+  color: var(--ink-a8);
+  transition: color .2s ease;
+}
+
+.foot-links a:hover,
+.foot-links button:hover { color: var(--ink); }
+
+.foot-links a svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform .2s ease;
+}
+
+.foot-links a:hover svg { transform: translate(2px, -2px); }
+
+.foot-links .ic { width: 18px; height: 18px; }
+
+.foot-div {
+  height: 1px;
+  background: var(--line-2);
+}
+
+.foot-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .foot-cta {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+  }
+}
+
+.foot-cta-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.foot-cta-txt h3 {
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: clamp(17px, 1.3vw, 22px);
+}
+
+.foot-cta-txt p {
+  font-size: clamp(14px, 1vw, 16px);
+  color: var(--ink-a6);
+  max-width: 460px;
+}
+
+/* ---------- entrance ---------- */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise .7s cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: var(--d, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
+  * { transition: none !important; }
+}
 </style>
 </head>
 <body>
+<div class="page">
 
+  <header class="site-head rise" style="--d:0s">
+    <div class="wrap head-in">
+      <a class="brand" href="/" aria-label="Uzam home">
+        <img src="/uzam-logo.png" alt="" width="48" height="48" />
+        <span>Uzam</span>
+      </a>
+      <a class="btn btn-white" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a>
+    </div>
+  </header>
 
-<header class="site-header">
-  <div class="container header-inner">
-    <a class="wordmark" href="#top" aria-label="Uzam home"><span>UZAM</span></a>
-    <a class="header-action" href="#try">Try for free</a>
-  </div>
-</header>
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-in">
+          <span class="badge rise" style="--d:.1s">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M3 12h4l2.5-6 4 12L16 12h5" />
+            </svg>
+            Live on OKX.AI
+          </span>
+          <div class="rise" style="--d:.2s; width:100%">
+            <h1>RWA Intelligence research <span class="acc">agent.</span></h1>
+          </div>
+          <p class="lede rise" style="--d:.32s">Uzam is an RWA intelligence MCP that gives AI agents the ability to investigate tokenized assets using onchain data, official documents, issuer information and evidence-backed research.</p>
+          <div class="hero-actions rise" style="--d:.44s">
+            <a class="btn btn-solid" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a>
+            <a class="btn btn-ghost" href="https://uzam-production-95f9.up.railway.app/mcp" data-copy data-label="Free via MCP">
+              <svg class="ic ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <rect x="8" y="8" width="14" height="14" rx="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
+              <svg class="ic ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span class="lbl">Free via MCP</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 
-<main id="top">
-  <section class="hero">
-    <div class="container hero-inner">
-      <div class="hero-copy-wrap">
-        <p class="eyebrow eyebrow--center">Live on OKXAI</p>
-        <h1 class="display hero-title">RWA Intelligence research agent</h1>
-        <p class="lead hero-sub">Uzam is an RWA intelligence MCP that gives AI agents the ability to investigate tokenized assets using onchain data, official documents, issuer information and evidence-backed research.</p>
-        <div class="hero-actions"><a class="button" href="#try">Try for free <span class="arrow" aria-hidden="true">↗</span></a><a class="button secondary" href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">Hire on OKX.AI</a></div>
+  <footer class="site-foot rise" style="--d:.55s">
+    <div class="wrap foot-in">
+      <div class="foot-left">
+        <a class="brand" href="/" aria-label="Uzam home">
+          <img src="/uzam-logo.png" alt="" width="48" height="48" />
+          <span>Uzam</span>
+        </a>
+        <p class="foot-tag">RWA Intelligence research agent.</p>
+        <p class="foot-year">&copy; 2026 Uzam</p>
       </div>
 
+      <div class="foot-right">
+        <div>
+          <h2 class="foot-h">Links</h2>
+          <ul class="foot-links" style="margin-top:20px">
+            <li>
+              <a href="https://www.okx.ai/agents/13653" target="_blank" rel="noopener noreferrer">
+                OKX.AI
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M7 17 17 7" /><path d="M9 7h8v8" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a href="https://github.com/zachbuilds26/uzam" target="_blank" rel="noopener noreferrer">
+                GitHub
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M7 17 17 7" /><path d="M9 7h8v8" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <button type="button" data-copy data-label="MCP endpoint" aria-label="Copy MCP endpoint URL">
+                <svg class="ic ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <rect x="8" y="8" width="14" height="14" rx="2" />
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+                <svg class="ic ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <span class="lbl">MCP endpoint</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <span class="foot-div" aria-hidden="true"></span>
+
+        <div class="foot-cta">
+          <div class="foot-cta-txt">
+            <h3>Free via MCP</h3>
+            <p>Point your agent at the endpoint. Every answer arrives with its sources, evidence classes, and unknowns named.</p>
+          </div>
+          <a class="btn btn-white" href="https://uzam-production-95f9.up.railway.app/mcp" data-copy data-label="Copy MCP URL">
+            <svg class="ic ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <rect x="8" y="8" width="14" height="14" rx="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+            <svg class="ic ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span class="lbl">Copy MCP URL</span>
+          </a>
+        </div>
+      </div>
     </div>
-  </section>
+  </footer>
 
-  <section class="section" id="about"><div class="container"><div class="intro-grid"><div><p class="eyebrow">Research infrastructure</p><h2>See what the price leaves out.</h2></div><div><p class="intro-copy">A price is only the starting point. Uzam brings together issuer claims, official documents, market data, and onchain behavior so your agent can cite the full picture.</p><div class="stats"><div class="stat"><strong>16</strong><span>assets covered</span></div><div class="stat"><strong>9</strong><span>risk checks</span></div><div class="stat"><strong>196</strong><span>X Layer chain</span></div></div></div></div></div></section>
+  <span id="copy-status" class="sr-only" aria-live="polite"></span>
+</div>
 
-  <section class="section section--alt" id="strategies"><div class="container strategy-layout"><div class="strategy-intro"><p class="eyebrow">How it works</p><h2>From symbol to sourced report.</h2><p>Start with a symbol. End with evidence you can review and use.</p></div><div class="strategy-list">
-    <article class="strategy-card"><span class="strategy-icon">⌁</span><div><span class="strategy-number">01</span><h3>Identify the asset</h3><p>Resolve the issuer, underlying asset, chain, official pages, and contract without guessing.</p></div></article>
-    <article class="strategy-card"><span class="strategy-icon">▱</span><div><span class="strategy-number">02</span><h3>Check the evidence</h3><p>Separate issuer claims from facts observed across documents, filings, and market data.</p></div></article>
-    <article class="strategy-card"><span class="strategy-icon">◌</span><div><span class="strategy-number">03</span><h3>Read the market</h3><p>See price premium, holders, concentration, liquidity, pools, and recent range.</p></div></article>
-    <article class="strategy-card"><span class="strategy-icon">△</span><div><span class="strategy-number">04</span><h3>Show the risks</h3><p>Nine fixed risk checks ranked high to low, with the missing evidence and the event that could change the conclusion.</p></div></article>
-    <article class="strategy-card"><span class="strategy-icon">↗</span><div><span class="strategy-number">05</span><h3>Built for agents</h3><p>Use MCP, REST, or x402 with structured output made for agent workflows.</p></div></article>
-  </div></div></section>
-
-  <section class="section live-section" id="try"><div class="container live-layout"><div><p class="eyebrow">Try real research · free via MCP</p><h2>Get a clearer answer.</h2><p class="lead">Choose an asset and language, then run an instant identity check or a full evidence-backed report.</p></div><div class="trybox"><div class="trybox-top"><strong>Live research console</strong><span>MCP endpoint</span></div><div class="tryrow"><select id="sym" aria-label="Token symbol"><option value="AAPLx">AAPLx — Apple</option><option value="TSLAx">TSLAx — Tesla</option><option value="NVDAx" selected>NVDAx — NVIDIA</option><option value="SPYx">SPYx — S&amp;P 500</option><option value="GOOGLx">GOOGLx — Alphabet</option><option value="MSFTx">MSFTx — Microsoft</option><option value="AMZNx">AMZNx — Amazon</option><option value="METAx">METAx — Meta</option><option value="NFLXx">NFLXx — Netflix</option><option value="AMDx">AMDx — AMD</option><option value="COINx">COINx — Coinbase</option><option value="HOODx">HOODx — Robinhood</option><option value="AVGOx">AVGOx — Broadcom</option><option value="JPMx">JPMx — JPMorgan</option><option value="Vx">Vx — Visa</option><option value="PLTRx">PLTRx — Palantir</option></select><select id="lang" aria-label="Response language"><option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option></select></div><div class="tryrow"><button class="button secondary" id="btnId" type="button">Identify — instant</button><button class="button" id="btnGo" type="button">Full report — ~20s</button></div><p id="tryStatus" role="status"></p><div id="tryOut" class="result-output" aria-live="polite"><p class="answer-muted">Your answer will appear here.</p></div></div></div></section>
-
-  <section class="section" id="api"><div class="container architecture"><div><p class="eyebrow">Research that fits your stack</p><h2>Built for agents.</h2></div><div><p class="architecture-copy">Connect once, get structured research, and keep the boundary around what is known visible. <code>402 Payment Required</code> handles paid depth without a billing dashboard.</p><div class="architecture-cards"><article class="architecture-card"><span class="card-icon">⌁</span><span class="card-index">01 / FREE TO START</span><h3>MCP access</h3><p>Connect an agent to one URL and ask about any supported token.</p></article><article class="architecture-card"><span class="card-icon">$</span><span class="card-index">02 / PAY FOR DEPTH</span><h3>Paid research depth</h3><p>Pay for deeper research in USDT0 on X Layer, without signup or a billing dashboard.</p></article><article class="architecture-card"><span class="card-icon">✓</span><span class="card-index">03 / READY TO CITE</span><h3>Citable output</h3><p>Every report includes sources, timestamps, confidence, missing data, and clear limits.</p></article></div></div></div></section>
-
-  <section class="section section--alt" id="pricing"><div class="container"><div class="pricing-head"><h2>Free to start.<br />Pay to go deeper.</h2><p>Discovery is open. Deeper reports are paid per call in USDT0 on X Layer through x402.</p></div><div class="price-grid"><article class="price-card"><h3>MCP access</h3><div class="price">$0.00 <small>/ always</small></div><p>Five research tools for agents.</p></article><article class="price-card"><h3>Identify</h3><div class="price">$0.08 <small>/ call</small></div><p>60-second identity check: what the token is, verification checks, unknowns. No market data.</p></article><article class="price-card"><h3>Preview</h3><div class="price">$0.08 <small>/ call</small></div><p>Check whether an asset is covered.</p></article><article class="price-card"><h3>Full report</h3><div class="price">$0.25 <small>/ call</small></div><p>Evidence dossier: findings, backing split, on-chain, liquidity + impact, 10 risks, source register.</p></article><article class="price-card"><h3>Compare ×4</h3><div class="price">$0.50 <small>/ call</small></div><p>Side-by-side table for up to 4 assets. Observations only, never a winner.</p></article></div><div class="trust-grid" id="trust"><article class="trust-card"><span class="card-icon">×</span><h3>No invented answers</h3><p>Unknown symbols return the supported list. Missing data stays visible.</p></article><article class="trust-card"><span class="card-icon">≠</span><h3>Claims vs facts</h3><p>Issuer statements stay labeled as claims until independent evidence supports them.</p></article><article class="trust-card"><span class="card-icon">?</span><h3>Unknowns stay visible</h3><p>Every report says what could not be proven and what would change the conclusion.</p></article><article class="trust-card"><span class="card-icon">!</span><h3>Never calls assets safe</h3><p>Nine fixed risk checks, ranked high to low. Only observed severity, never a promise.</p></article></div></div></section>
-
-  <section class="cta" id="start"><div class="container"><div class="cta-inner"><h2>Get a clearer answer.</h2><p>Pick an asset, review the evidence, and give your agent a report it can cite.</p><a class="button" href="#try">Open research console <span class="arrow">↗</span></a></div></div></section>
-</main>
-
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-bottom">
-      <span class="wordmark" aria-label="Uzam">Uzam</span>
-      <span>Live on OKXAI</span>
-    </div>
-  </div>
-</footer>
 <script>
 (function () {
-  var sym = document.getElementById('sym');
-  var lang = document.getElementById('lang');
-  var out = document.getElementById('tryOut');
-  var status = document.getElementById('tryStatus');
-  var btnId = document.getElementById('btnId');
-  var btnGo = document.getElementById('btnGo');
-  if (!sym || !out) return;
+  var MCP = 'https://uzam-production-95f9.up.railway.app/mcp';
+  var status = document.getElementById('copy-status');
 
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, function (char) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+  function copyMcp() {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(MCP);
+    }
+    return new Promise(function (resolve, reject) {
+      var t = document.createElement('textarea');
+      t.value = MCP;
+      t.style.position = 'fixed';
+      t.style.opacity = '0';
+      document.body.appendChild(t);
+      t.select();
+      try {
+        document.execCommand('copy') ? resolve() : reject();
+      } catch (e) {
+        reject(e);
+      }
+      t.remove();
     });
   }
 
-  function inlineMarkdown(value) {
-    var safe = escapeHtml(value);
-    safe = safe.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    safe = safe.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>');
-    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    safe = safe.replace(/__([^_]+)__/g, '<strong>$1</strong>');
-    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    return safe;
-  }
-
-  function labelize(value) {
-    return String(value).replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-  }
-
-  function renderAnswer(value) {
-    var text = String(value || '').replace(/\r/g, '').trim();
-    if (!text) return '<p class="answer-muted">No answer was returned.</p>';
-    var lines = text.split('\n');
-    var html = [];
-    var paragraph = [];
-    var listTag = null;
-    function flushParagraph() {
-      if (paragraph.length) {
-        html.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
-        paragraph = [];
-      }
-    }
-    function closeList() {
-      if (listTag) { html.push('</' + listTag + '>'); listTag = null; }
-    }
-    lines.forEach(function (raw) {
-      var line = raw.trim();
-      if (!line) { flushParagraph(); closeList(); return; }
-      var heading = line.match(/^#{1,6}\s+(.+)$/);
-      var bullet = line.match(/^[-*•]\s+(.+)$/);
-      var numbered = line.match(/^\d+[.)]\s+(.+)$/);
-      var pair = line.match(/^([^:]{2,48}):\s+(.+)$/);
-      if (heading) {
-        flushParagraph(); closeList(); html.push('<h3>' + inlineMarkdown(heading[1]) + '</h3>');
-      } else if (bullet || numbered) {
-        flushParagraph();
-        var tag = numbered ? 'ol' : 'ul';
-        if (listTag !== tag) { closeList(); html.push('<' + tag + '>'); listTag = tag; }
-        html.push('<li>' + inlineMarkdown((bullet || numbered)[1]) + '</li>');
-      } else if (pair && !/^https?:\/\//i.test(pair[2])) {
-        flushParagraph(); closeList();
-        html.push('<div class="answer-row"><span class="answer-label">' + inlineMarkdown(pair[1]) + '</span><span class="answer-value">' + inlineMarkdown(pair[2]) + '</span></div>');
-      } else {
-        closeList(); paragraph.push(line);
-      }
-    });
-    flushParagraph(); closeList();
-    return html.join('');
-  }
-
-  function renderResponse(data) {
-    if (data && typeof data.summary === 'string' && data.summary.trim()) return renderAnswer(data.summary);
-    if (typeof data === 'string') return renderAnswer(data);
-    if (data && typeof data === 'object') {
-      var lines = Object.keys(data).map(function (key) {
-        var value = data[key];
-        return labelize(key) + ': ' + (typeof value === 'object' ? JSON.stringify(value) : String(value));
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (el) {
+    var lbl = el.querySelector('.lbl');
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      copyMcp().then(function () {
+        el.classList.add('is-copied');
+        if (lbl) lbl.textContent = 'Copied';
+        if (status) status.textContent = 'MCP endpoint copied to clipboard';
+        clearTimeout(el._t);
+        el._t = setTimeout(function () {
+          el.classList.remove('is-copied');
+          if (lbl) lbl.textContent = el.getAttribute('data-label');
+        }, 2000);
+      }).catch(function () {
+        if (lbl) lbl.textContent = 'Copy failed';
+        if (status) status.textContent = 'Copy failed';
       });
-      return renderAnswer(lines.join('\n'));
-    }
-    return renderAnswer(data);
-  }
-
-  function setBusy(busy, label) {
-    btnId.disabled = busy;
-    btnGo.disabled = busy;
-    if (busy) status.textContent = label;
-  }
-
-  function mcpCall(tool, args) {
-    return fetch('/mcp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: tool, arguments: args } })
-    }).then(function (res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' — host may be waking, retry shortly.');
-      return res.text();
-    }).then(function (text) {
-      var lines = text.split('\n').filter(function (line) { return line.indexOf('data: ') === 0; });
-      if (!lines.length) throw new Error('No MCP data in response — try again.');
-      var msg = JSON.parse(lines[lines.length - 1].slice(6));
-      if (msg.error) throw new Error(msg.error.message || 'MCP error');
-      var content = (msg.result && msg.result.content && msg.result.content[0]) || {};
-      if (msg.result && msg.result.isError) throw new Error(content.text || 'Tool error');
-      return JSON.parse(content.text || '{}');
     });
-  }
-
-  function identifyText(data) {
-    if (!data.found) return 'Not in registry:\nSupported symbols: ' + (data.supported_symbols || []).join(', ') + '\n' + (data.uncertainty || '');
-    var lines = [];
-    lines.push(data.symbol + ' — ' + data.name);
-    lines.push('Issuer: ' + data.issuer + (data.issuer_legal ? ' (' + data.issuer_legal + ')' : ''));
-    lines.push('Underlying: ' + (data.underlying_asset || ''));
-    if (data.underlying && data.underlying.ticker) lines.push('Ticker: ' + data.underlying.ticker + ' · ' + (data.underlying.exchange || ''));
-    lines.push('Chain: ' + (data.chains || []).join(', ') + ' (' + (data.chainIds || []).join(', ') + ')');
-    if (data.live && data.live.available) lines.push('Live price: $' + data.live.price);
-    else if (data.live) lines.push('Live price: ' + (data.live.reason || 'unavailable'));
-    lines.push('Official documents:');
-    (data.official_documents || []).forEach(function (url) { lines.push('- ' + url); });
-    return lines.join('\n');
-  }
-
-  btnId.addEventListener('click', function () {
-    setBusy(true, 'Checking the asset…');
-    out.innerHTML = '<p class="answer-muted">Working on it…</p>';
-    mcpCall('identify_asset', { symbol: sym.value, lang: lang.value }).then(function (data) {
-      out.innerHTML = renderAnswer(identifyText(data));
-      status.textContent = 'Free via MCP · live response.';
-    }).catch(function (error) {
-      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the answer: ' + error.message) + '</p>';
-      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
-    }).then(function () { setBusy(false); });
   });
-
-  btnGo.addEventListener('click', function () {
-    setBusy(true, 'Research takes about 20 seconds…');
-    out.innerHTML = '<p class="answer-muted">Gathering evidence from documents and onchain data…</p>';
-    mcpCall('research_asset', { symbol: sym.value, focus: 'full', lang: lang.value }).then(function (data) {
-      out.innerHTML = renderResponse(data);
-      status.textContent = 'Free via MCP · full report above.';
-    }).catch(function (error) {
-      out.innerHTML = '<p class="answer-error">' + escapeHtml('Could not load the report: ' + error.message) + '</p>';
-      status.textContent = 'Error — retry, or check /health.'; status.className = 'err';
-    }).then(function () { setBusy(false); });
-  });
-}());
+})();
 </script>
 </body>
 </html>
